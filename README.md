@@ -79,17 +79,15 @@ That's **98% fewer tokens**. The LLM gets the same signal â€” all builds pass â€
 OMNI is a standard **Model Context Protocol (MCP)** server.
 
 ### Claude Code & Antigravity
-Add this to `~/.claude/config.json`:
-```json
-{
-  "mcpServers": {
-    "omni": {
-      "command": "node",
-      "args": ["/path/to/omni/dist/index.js"]
-    }
-  }
-}
+The OMNI CLI is for humans, but **`omni-mcp`** is for your AI. It allows Claude or Antigravity to use OMNI's distillation tools automatically.
+
+To connect OMNI to Claude Code:
+```bash
+claude config add mcp omni omni-mcp
 ```
+
+> [!NOTE]
+> When starting, you might see an `ExperimentalWarning: WASI`. This is expected! OMNI uses high-performance WebAssembly (WASI) at its core, which Node.js currently labels as experimental. It is completely safe to use.
 
 ---
 
