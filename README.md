@@ -99,7 +99,7 @@ claude config add mcp omni omni-mcp
 
 ## The Power Comparison: Precise Intelligence
 
-| Feature | **OMNI 🌌** | RTK 🛠️ | Snip ✂️ | Serena 🎀 |
+| Feature | **OMNI** | RTK | Snip | Serena |
 | :--- | :--- | :--- | :--- | :--- |
 | **Language** | **Zig + Wasm** | Rust | Go | Python |
 | **Philosophy** | **Semantic Distillation** | Tool Proxying | YAML Pipelines | IDE-like Retrieval |
