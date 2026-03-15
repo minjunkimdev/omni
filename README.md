@@ -11,19 +11,25 @@
 </p>
 
 <p align="center">
-  <strong>Stop Truncating. Start Distilling.</strong><br>
-  OMNI is a hyper-performance semantic distillation engine that transforms chaotic data into pure,<br>high-density intelligence for LLMs — powered by Zig, portable via Wasm.
+  <strong>The first MCP-native semantic distillation engine</strong><br>
+  that transforms chaotic CLI output into pure, high-density intelligence for LLMs.<br>
+  Eliminates <strong>30–90% of token noise</strong> — powered by Zig, portable via Wasm.
 </p>
 
 ---
 
-## The OMNI Brand: Efficiency Reinvented
+## Why OMNI
 
-While others count tokens, **OMNI understands context.** In the era of autonomous agents, context is the new currency. Truncating data is a loss; OMNI's **Semantic Distillation** ensures that every token your LLM receives is pure information signal, zero noise.
+AI agents running on **Model Context Protocol (MCP)** are only as smart as the context they receive. When Claude runs `git diff`, `docker build`, or `npm install`, it drowns in hundreds of redundant lines it will never use — burning your context window and slowing down every response.
 
-- **Native Speed**: Powered by Zig 0.15.2. No garbage collection, no overhead.
-- **Edge Portability**: A 68KB Wasm core that runs anywhere from local terminals to edge runtimes.
-- **Agentic Intelligence**: Built specifically for MCP-enabled agents like Claude.
+**OMNI is the missing layer.** It sits as an MCP server between your agent and the world, intercepting tool output and distilling it to pure signal — automatically, with zero config.
+
+- **30–90% token reduction** across Git, Docker, SQL, Node, and Build tool outputs
+- **< 1ms filter latency** — powered by Zig 0.15.2, no GC, no overhead
+- **68KB Wasm footprint** — runs anywhere from your local terminal to edge runtimes
+- **MCP-first design** — native integration with Claude Code, Cursor, Windsurf, and any MCP agent
+- **Zero config** — pipe any CLI output through OMNI and it just works
+
 
 ---
 
@@ -58,17 +64,17 @@ OMNI sits between your AI agent and the outside world — silently distilling ch
   └────────┬─────────┘
            │ stdin pipe
            ▼
-  ┌──────────────────────────────────────────────────────────┐
+  ┌───────────────────────────────────────────────────────────┐
   │                    OMNI MCP SERVER                        │
-  │                                                          │
-  │   ┌─────────────┐     ┌────────────────────────────┐    │
-  │   │ LRU Cache   │────▶│  Filter Engine (Zig + Wasm) │   │
-  │   │  < 1ms hit  │     │  Git · SQL · Docker · Node  │   │
-  │   └─────────────┘     └────────────┬───────────────┘    │
-  │                                    │ Semantic Distill    │
-  │             ┌──────────────────────▼──────────────────┐  │
-  │             │  Pure Signal  (30–90% token reduction)   │  │
-  │             └──────────────────────┬──────────────────┘  │
+  │                                                           │
+  │   ┌─────────────┐     ┌─────────────────────────────┐     │
+  │   │ LRU Cache   │────▶│  Filter Engine (Zig + Wasm) │     │
+  │   │  < 1ms hit  │     │  Git · SQL · Docker · Node  │     │
+  │   └─────────────┘     └────────────┬────────────────┘     │
+  │                                    │ Semantic Distill     │
+  │             ┌──────────────────────▼──────────────────┐   │
+  │             │  Pure Signal  (30–90% token reduction)  │   │
+  │             └──────────────────────┬──────────────────┘   │
   └──────────────────────────────────  │ ─────────────────────┘
                                        │
                                        ▼
@@ -78,10 +84,8 @@ OMNI sits between your AI agent and the outside world — silently distilling ch
                           │   zero noise            │
                           └────────────────────────┘
 
-  No filter match → passthrough unchanged (zero overhead)
-  ─────────────────────────────────────────────────────────────
 ```
-
+No filter match → passthrough unchanged (zero overhead)
 ---
 
 ## The OMNI Effect
