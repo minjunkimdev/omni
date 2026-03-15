@@ -1,4 +1,8 @@
-# OMNI: The Semantic Core for the Agentic Era
+<p align="center">
+  <img src="brand-logo.png" alt="OMNI - The Semantic Core" width="300" />
+</p>
+
+<h1 align="center">OMNI: The Semantic Core for the Agentic Era</h1>
 
 <p align="center">
   <a href="https://github.com/fajarhide/omni/actions"><img src="https://github.com/fajarhide/omni/workflows/CI/badge.svg" alt="CI"></a>
@@ -6,8 +10,10 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-> **Stop Truncating. Start Distilling.**  
-> OMNI (Optimization Middleware & Next-gen Interface) is a hyper-performance distillation engine that transforms chaotic data into pure, high-density intelligence for LLMs.
+<p align="center">
+  <strong>Stop Truncating. Start Distilling.</strong><br>
+  OMNI is a hyper-performance semantic distillation engine that transforms chaotic data into pure,<br>high-density intelligence for LLMs — powered by Zig, portable via Wasm.
+</p>
 
 ---
 
