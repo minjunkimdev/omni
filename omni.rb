@@ -1,7 +1,7 @@
 class Omni < Formula
   desc "Semantic Distillation Engine for the Agentic Era"
   homepage "https://github.com/fajarhide/omni"
-  url "https://github.com/fajarhide/omni/archive/refs/tags/v0.3.6.tar.gz"
+  url "https://github.com/fajarhide/omni/archive/refs/tags/v0.3.7.tar.gz"
   sha256 "e760d8f6f5487e4a11dc7ae7e7a0d3325220c086e59fb63dd996b3ad91fe6302"
   license "MIT"
 
@@ -32,10 +32,14 @@ class Omni < Formula
     (libexec/"core").install "bin/omni-wasm.wasm"
   end
 
-  def post_install
-    # Automatically triggers `omni setup` which will gracefully create 
-    # the ~/.omni/dist/index.js symlink for zero-config integration.
-    system "#{bin}/omni", "setup"
+  def caveats
+    <<~EOS
+      🌌 OMNI SETUP & INTEGRATION GUIDE
+      ══════════════════════════════════════════════════════════
+
+      To complete the setup and configure the MCP server, run:
+        omni setup
+    EOS
   end
 
   test do

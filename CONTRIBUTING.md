@@ -24,7 +24,6 @@ We love your contributions! OMNI is built on a mission to make context usage as 
 ## 🏛 Architecture
 
 Before modifying the core, please read:
-- [ARCHITECTURE.md](ARCHITECTURE.md)
 - [DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ## ⚖️ Code of Conduct

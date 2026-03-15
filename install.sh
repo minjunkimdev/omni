@@ -16,9 +16,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-info() { printf "${GREEN}[INFO]${NC} %s\n" "$1"; }
-warn() { printf "${YELLOW}[WARN]${NC} %s\n" "$1"; }
-error() { printf "${RED}[ERROR]${NC} %s\n" "$1"; exit 1; }
+info() { printf "${GREEN}[INFO]${NC} %b\n" "$1"; }
+warn() { printf "${YELLOW}[WARN]${NC} %b\n" "$1"; }
+error() { printf "${RED}[ERROR]${NC} %b\n" "$1"; exit 1; }
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
@@ -62,8 +62,8 @@ cd "$TEMP_DIR/src"
 # 4. Build
 info "Building OMNI Native Core (Zig)..."
 cd core
-zig build -Doptimize=ReleaseFast -p "$TEMP_DIR/install_root"
-zig build wasm -Doptimize=ReleaseSmall -p "$TEMP_DIR/install_root"
+zig build -Dversion=${LATEST_TAG:-development} -Doptimize=ReleaseFast -p "$TEMP_DIR/install_root"
+zig build wasm -Dversion=${LATEST_TAG:-development} -Doptimize=ReleaseSmall -p "$TEMP_DIR/install_root"
 cd ..
 
 info "Bundling OMNI MCP Server (Node.js)..."
@@ -114,9 +114,7 @@ if ! echo "$PATH" | grep -q "$INSTALL_DIR/bin"; then
         if ! grep -q "Added by OMNI" "$PROFILE_FILE"; then
             info "Adding OMNI to PATH in $PROFILE_FILE..."
             printf "\n# Added by OMNI\nexport PATH=\"\$HOME/.omni/bin:\$PATH\"\n" >> "$PROFILE_FILE"
-            export PATH="$HOME/.omni/bin:$PATH" && omni --version
             info "PATH updated in $PROFILE_FILE successfully."
-            info "PATH aktif untuk session ini."
         fi
     else
         warn "Shell profile $PROFILE_FILE not found. Please add OMNI to your PATH manually:"
@@ -126,10 +124,6 @@ fi
 
 
 # 8. Success & Instructions
-echo ""
-echo "${GREEN}✅ OMNI successfully installed!${NC}"
-echo "════════════════════════════════════════════"
-
-info "Run 'source $PROFILE_FILE' to activate OMNI in current session."
-info "Verify: Run 'omni --version' from any terminal."
+info "Run '${YELLOW}source $PROFILE_FILE${NC}' to activate OMNI in current session."
+info "Verify: Run '${YELLOW}omni --version${NC}' from any terminal."
 info "OMNI is mission-ready. 🌌"

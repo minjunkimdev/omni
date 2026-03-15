@@ -43,7 +43,7 @@ pub fn main() !void {
             try printHelp();
             return;
         } else if (std.mem.eql(u8, cmd, "-v") or std.mem.eql(u8, cmd, "--version") or std.mem.eql(u8, cmd, "version")) {
-            try std.fs.File.stdout().deprecatedWriter().print("OMNI Core v{s} (Zig)\n", .{build_options.version});
+            try std.fs.File.stdout().deprecatedWriter().print("OMNI Core {s} (Zig)\n", .{build_options.version});
             return;
         } else if (std.mem.eql(u8, cmd, "density")) {
             try handleDensity(allocator, filters.items);
