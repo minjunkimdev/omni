@@ -46,11 +46,18 @@ echo "✨ New SHA256: $NEW_SHA"
 # 6. Update local omni.rb with new SHA
 sed -i '' "s|sha256 \".*\"|sha256 \"$NEW_SHA\"|g" omni.rb
 
-# 7. Sync with Tap if exists
+BREW_TAP_PATH=$(brew --repository fajarhide/omni 2>/dev/null || echo "")
+
+# 7. Sync with Tap if exists (local sibling first, then brew tap)
 if [ -d "$TAP_REPO_PATH" ]; then
     echo "🔄 Syncing with Homebrew Tap at $TAP_REPO_PATH..."
     cp omni.rb "$TAP_REPO_PATH/omni.rb"
     (cd "$TAP_REPO_PATH" && git add omni.rb && git commit -m "update omni to $TAG" && git push origin main)
+    echo "✅ Tap updated!"
+elif [ -n "$BREW_TAP_PATH" ] && [ -d "$BREW_TAP_PATH" ]; then
+    echo "🔄 Syncing with Homebrew Tap at $BREW_TAP_PATH..."
+    cp omni.rb "$BREW_TAP_PATH/omni.rb"
+    (cd "$BREW_TAP_PATH" && git add omni.rb && git commit -m "update omni to $TAG" && git push origin main)
     echo "✅ Tap updated!"
 else
     echo "⚠️  Tap repository not found at $TAP_REPO_PATH. Please manual update it with SHA: $NEW_SHA"
