@@ -24,15 +24,17 @@ class Omni < Formula
     (lib/"omni").install "bin/omni-wasm.wasm"
 
     # Install MCP Server
-    system "npm", "install", *std_npm_args(libexec: libexec)
-    system "npm", "run", "build"
+    libexec.install "package.json", "src"
+    cd libexec do
+      system "npm", "install", *std_npm_args
+      system "npm", "run", "build"
+    end
     # Create a wrapper for the MCP server
     (bin/"omni-mcp").write <<~EOS
       #!/bin/bash
       export OMNI_WASM_PATH="#{lib}/omni/omni-wasm.wasm"
       node "#{libexec}/dist/index.js" "$@"
     EOS
-    libexec.install "dist", "package.json", "node_modules"
   end
 
   test do
