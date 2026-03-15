@@ -25,7 +25,7 @@ class Omni < Formula
 
     # Install MCP Server
     # Use plain local npm install so devDeps (typescript/tsc) are available for build
-    libexec.install "package.json", "src"
+    libexec.install "package.json", "package-lock.json", "tsconfig.json", "src"
     cd libexec do
       system "npm", "install"
       system "./node_modules/.bin/tsc"
