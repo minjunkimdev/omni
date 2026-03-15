@@ -1,15 +1,15 @@
-# OMNI Development Guide 🛠
+# OMNI Development Guide
 
 Welcome to the Project OMNI development guide. This document outlines how to maintain the core engine and expand its semantic filtering capabilities.
 
-## 🏗 Architecture Overview
+## Architecture Overview
 
 OMNI consists of three main components:
 1.  **Zig Core (Native CLI)**: A high-performance binary (`omni`) providing diagnostic and distillation subcommands.
 2.  **Zig Core (Wasm)**: A portable version of the engine for MCP edge integration.
 3.  **TypeScript Host**: The MCP gateway that orchestrates Wasm execution with an integrated LRU cache.
 
-## 🌈 Adding a New Filter
+## Adding a New Filter
 
 To add a new semantic filter:
 
@@ -45,7 +45,7 @@ To add a new semantic filter:
 
 3.  **Update Interface**: If the filter requires shared state, use the `ptr` field and cast it within your functions.
 
-## 🕸 WebAssembly Bridge
+## WebAssembly Bridge
 
 OMNI uses a custom-packed `u64` return to communicate between Zig and the JavaScript host.
 - **High 32 bits**: Length of the result.
@@ -53,7 +53,7 @@ OMNI uses a custom-packed `u64` return to communicate between Zig and the JavaSc
 
 When modifying the `compress` export in `wasm.zig`, ensure that both memory and string encodings are correctly handled on the TypeScript side (`src/index.ts`).
 
-## 🧪 Testing
+## Testing
 
 Run native engine unit tests:
 ```bash
@@ -68,7 +68,7 @@ Verify CLI performance and stability:
 
 This will produce a small, optimized `.wasm` binary suitable for edge distribution.
 
-## 🚀 Official Release Workflow
+## Official Release Workflow
 
 To release a new version of OMNI and update the Homebrew tap:
 
@@ -80,7 +80,7 @@ To release a new version of OMNI and update the Homebrew tap:
     This script will:
     - Update the version and SHA256 in `omni.rb`.
     - Tag and push the current commit.
-    - Fetch the new archive and update the checksum.
+    - Fetch the new archive and update the thecksum.
     - Sync the changes to the `homebrew-omni` repository.
 
 3.  **Manual Check**: Verify the release at [GitHub Releases](https://github.com/fajarhide/omni/releases).
