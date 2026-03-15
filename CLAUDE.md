@@ -13,6 +13,7 @@ This file provides guidance to Claude Code when working in the **OMNI** reposito
 - `zig build test` - Run all core tests
 - `zig build wasm` - Build WebAssembly binary
 - `zig fmt core/src/` - Format Zig code
+- `./scripts/omni-release.sh <v>` - Run full release & Homebrew sync
 
 ### OMNI CLI
 - `omni report` - Unified system metrics and status
