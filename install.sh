@@ -126,4 +126,4 @@ fi
 # 8. Success & Instructions
 info "Run '${YELLOW}source $PROFILE_FILE${NC}' to activate OMNI in current session."
 info "Verify: Run '${YELLOW}omni --version${NC}' from any terminal."
-info "OMNI is mission-ready. 🌌"
+info "OMNI is mission-ready."

@@ -19,7 +19,9 @@ graph TD
 ## Key Components
 
 ### 1. Unified CLI (The Control Center)
-- Native binary providing `omni distill`, `omni report`, `omni bench`, and `omni setup`.
+- Native binary providing `omni distill`, `omni report`, `omni bench`, `omni setup`, `omni update`, and `omni uninstall`.
+- Self-update checking via GitHub Releases API.
+- Intelligent environment detection (Homebrew vs installer) for stable symlinks.
 - Eliminates the need for external shell-scripts for orchestration.
 
 ### 2. OMNI Engine (The Brain)

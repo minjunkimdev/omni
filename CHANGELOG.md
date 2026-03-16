@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-03-16
+
+### Added
+- **`omni update`**: Check for the latest release from GitHub and get smart update instructions (auto-detects Homebrew vs installer).
+- **`omni uninstall`**: Clean removal of `~/.omni` directory and automatic cleanup of MCP configs from Antigravity, Claude Code CLI, and Claude Desktop.
+- **AI PR Describer**: Added `.github/workflows/ai-pr-describer.yml` for automated pull request descriptions.
+
+### Fixed
+- **Homebrew Upgrade Stability**: `omni setup` now uses stable `/opt/omni` paths instead of versioned `/Cellar/omni/X.X.X` paths, preventing broken symlinks after `brew upgrade`.
+- **Self-referencing Symlink**: `omni setup` now skips symlinking when source and destination are the same path.
+- **Dynamic Versioning**: `build.zig` now defaults to the current release version instead of "development" when `-Dversion` is not specified.
+
+### Changed
+- **Release script**: Now synchronizes **9 locations** (added `core/build.zig` default version).
+- Simplified `.github/pull_request_template.md` to checklist-only format.
+
+## [0.3.8] - 2026-03-16
+
+### Fixed
+- **Version Synchronization**: All 8 versioned files now fully synchronized (`package.json`, `package-lock.json`, `core/build.zig.zon`, `src/index.ts`, `src/index.js`, `scripts/omni-deploy-edge.sh`, `docs/index.html`, `omni.rb`).
+- **Release Automation**: `omni-release.sh` updated to handle docs and deploy script versioning.
+
 ## [0.3.7] - 2026-03-16
 
 ### Added
@@ -54,4 +76,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom JSON-based rules for masking/removal.
 
 ---
-*Follow the 🌌 OMNI vision.*
+*Follow the OMNI vision.*

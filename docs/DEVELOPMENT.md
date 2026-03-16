@@ -75,12 +75,12 @@ To release a new version of OMNI and update the Homebrew tap:
 1.  **Update `CHANGELOG.md`**: Add the new version and its changes.
 2.  **Run the Release Script**:
     ```bash
-    ./scripts/omni-release.sh 0.2.1
+    ./scripts/omni-release.sh 0.3.10
     ```
-    This script will:
-    - Update the version and SHA256 in `omni.rb`.
+    This script will automatically:
+    - Synchronize version strings across **9 locations** (`core/build.zig.zon`, `core/build.zig`, `package.json`, `package-lock.json`, `src/index.ts`, `src/index.js`, `scripts/omni-deploy-edge.sh`, `docs/index.html`, `omni.rb`).
     - Tag and push the current commit.
-    - Fetch the new archive and update the thecksum.
-    - Sync the changes to the `homebrew-omni` repository.
+    - Fetch the new archive and calculate SHA256.
+    - Sync the updated formula to the `homebrew-tap` repository.
 
 3.  **Manual Check**: Verify the release at [GitHub Releases](https://github.com/fajarhide/omni/releases).

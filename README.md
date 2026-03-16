@@ -2,6 +2,7 @@
   <img src="logo.png" alt="OMNI - The Semantic Core" width="300" />
 </p>
 
+
 <h1 align="center">The Semantic Core for the Agentic AI</h1>
 
 <p align="center">
@@ -45,6 +46,8 @@ OMNI provides a powerful, multi-purpose CLI that consolidates all diagnostic and
 | **`bench`** | High-speed benchmark for semantic throughput. |
 | **`generate`** | Outputs templates for Claude Code, Antigravity, and others. |
 | **`setup`** | Interactive guide for integration and standard aliasing. |
+| **`update`** | Check for the latest version from GitHub Releases. |
+| **`uninstall`** | Remove OMNI and clean up all MCP configurations. |
 
 ---
 
@@ -188,6 +191,12 @@ curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh
 ```
 
 For manual build instructions, see **[INSTALL.md](INSTALL.md)**.
+
+### Update & Uninstall
+```bash
+omni update       # Check for the latest version
+omni uninstall    # Remove OMNI and clean up all configs
+```
 
 ---
 

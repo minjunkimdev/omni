@@ -16,7 +16,10 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
-    const version = b.option([]const u8, "version", "Project version string") orelse "development";
+    const version = b.option([]const u8, "version", "Project version string") orelse v: {
+        // Fallback: try to read from build.zig.zon if b.version is not available or if we want to be safe
+        break :v "0.3.9"; 
+    };
 
     const options = b.addOptions();
     options.addOption([]const u8, "version", version);

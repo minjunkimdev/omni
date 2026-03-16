@@ -70,6 +70,12 @@ pub fn main() !void {
         } else if (std.mem.eql(u8, cmd, "setup")) {
             try handleSetup();
             return;
+        } else if (std.mem.eql(u8, cmd, "update")) {
+            try handleUpdate(allocator);
+            return;
+        } else if (std.mem.eql(u8, cmd, "uninstall")) {
+            try handleUninstall(allocator);
+            return;
         }
     }
 
@@ -79,7 +85,7 @@ pub fn main() !void {
 
 fn printHelp() !void {
     const help_text =
-        \\OMNI Native Core - Semantic Distillation Engine 🌌
+        \\OMNI Native Core - Semantic Distillation Engine
         \\
         \\Usage:
         \\  omni [subcommand] [options]
@@ -91,6 +97,8 @@ fn printHelp() !void {
         \\  bench [N]        Benchmark performance (default 100 iterations)
         \\  generate [agent] Generate template input_file for AI agents
         \\  setup            Show detailed setup and usage instructions
+        \\  update           Check for the latest version from GitHub
+        \\  uninstall        Remove OMNI and clean up all configurations
         \\
         \\Examples:
         \\  cat log.txt | omni
@@ -507,7 +515,23 @@ fn handleSetup() !void {
             std.fs.cwd().makeDir(omni_dist_dir.?) catch {};
 
             var buffer: [std.fs.max_path_bytes]u8 = undefined;
-            if (std.fs.selfExeDirPath(&buffer)) |exe_dir| {
+            if (std.fs.selfExeDirPath(&buffer)) |exe_dir_raw| {
+                var exe_dir = exe_dir_raw;
+                
+                // --- HOMEBREW STABILITY FIX ---
+                // If running from Cellar (e.g., /opt/homebrew/Cellar/omni/0.3.9/bin),
+                // transform to stable opt path (e.g., /opt/homebrew/opt/omni/bin)
+                // so symlinks don't break on upgrade.
+                const cellar_marker = std.fs.path.sep_str ++ "Cellar" ++ std.fs.path.sep_str ++ "omni" ++ std.fs.path.sep_str;
+                if (std.mem.indexOf(u8, exe_dir, cellar_marker)) |cellar_idx| {
+                    const prefix = exe_dir[0..cellar_idx];
+                    const suffix_start = std.mem.indexOfPos(u8, exe_dir, cellar_idx + cellar_marker.len, std.fs.path.sep_str) orelse exe_dir.len;
+                    const suffix = exe_dir[suffix_start..];
+                    
+                    exe_dir = std.fmt.allocPrint(alloc, "{s}" ++ std.fs.path.sep_str ++ "opt" ++ std.fs.path.sep_str ++ "omni{s}", .{prefix, suffix}) catch exe_dir;
+                    // Note: We don't free prefix/suffix as they are slices of exe_dir_raw (stack-based buffer)
+                }
+                
                 // Search candidate paths for index.js
                 const candidates = [_]?[]const u8{
                     std.fs.path.join(alloc, &.{ exe_dir, "..", "dist", "index.js" }) catch null,
@@ -529,9 +553,12 @@ fn handleSetup() !void {
                 if (real_src_dist != null) {
                     const dst_dist = std.fmt.allocPrint(alloc, "{s}/index.js", .{omni_dist_dir.?}) catch null;
                     if (dst_dist != null) {
-                        // Remove stale symlink if exists
-                        std.posix.unlink(dst_dist.?) catch {};
-                        std.posix.symlink(real_src_dist.?, dst_dist.?) catch {};
+                        // Skip if source and destination are already same path
+                        if (!std.mem.eql(u8, real_src_dist.?, dst_dist.?)) {
+                            // Remove stale symlink if exists
+                            std.posix.unlink(dst_dist.?) catch {};
+                            std.posix.symlink(real_src_dist.?, dst_dist.?) catch {};
+                        }
                     }
                 }
             } else |_| {}
@@ -586,11 +613,129 @@ fn handleSetup() !void {
         \\   omni bench 1000                     # Benchmark performance
         \\
         \\══════════════════════════════════════════════════════════
-        \\OMNI is mission-ready. 🌌
+        \\OMNI is mission-ready.
         \\
     ;
     try std.fs.File.stdout().deprecatedWriter().print("{s}", .{help_text});
 }
+
+fn handleUpdate(allocator: std.mem.Allocator) !void {
+    try std.fs.File.stdout().deprecatedWriter().print("🔍 Checking for updates...\n", .{});
+
+    const repo_url = "https://api.github.com/repos/fajarhide/omni/releases/latest";
+    const result = std.process.Child.run(.{
+        .allocator = allocator,
+        .argv = &[_][]const u8{ "curl", "-s", "-H", "Accept: application/vnd.github.v3+json", repo_url },
+    }) catch |err| {
+        try std.fs.File.stderr().deprecatedWriter().print("Error: Failed to run curl. Please ensure curl is installed.\n({any})\n", .{err});
+        return;
+    };
+    defer allocator.free(result.stdout);
+    defer allocator.free(result.stderr);
+
+    if (result.stdout.len == 0) {
+        try std.fs.File.stderr().deprecatedWriter().print("Error: Received empty response from GitHub.\n", .{});
+        return;
+    }
+
+    // Simple parsing for "tag_name": "vX.X.X"
+    const tag_marker = "\"tag_name\":";
+    if (std.mem.indexOf(u8, result.stdout, tag_marker)) |idx| {
+        const start = std.mem.indexOfPos(u8, result.stdout, idx + tag_marker.len, "\"") orelse return;
+        const end = std.mem.indexOfPos(u8, result.stdout, start + 1, "\"") orelse return;
+        const latest_tag = result.stdout[start + 1 .. end];
+
+        // Remove 'v' prefix if present for comparison
+        const latest_version = if (std.mem.startsWith(u8, latest_tag, "v")) latest_tag[1..] else latest_tag;
+        const current_version = build_options.version;
+
+        if (std.mem.eql(u8, latest_version, current_version)) {
+            try std.fs.File.stdout().deprecatedWriter().print("✨ OMNI is up to date (v{s}).\n", .{current_version});
+        } else {
+            try std.fs.File.stdout().deprecatedWriter().print("🚀 A new version of OMNI is available: {s} (current: v{s})\n", .{ latest_tag, current_version });
+
+            // Detect How to Update (Homebrew vs Installer)
+            var buffer: [std.fs.max_path_bytes]u8 = undefined;
+            if (std.fs.selfExePath(&buffer)) |exe_path| {
+                if (std.mem.indexOf(u8, exe_path, "Cellar") != null or std.mem.indexOf(u8, exe_path, "homebrew") != null) {
+                    try std.fs.File.stdout().deprecatedWriter().print("\nTo update, run:\n  brew upgrade omni\n", .{});
+                } else {
+                    try std.fs.File.stdout().deprecatedWriter().print("\nTo update, run the installer:\n  curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh\n", .{});
+                }
+            } else |_| {}
+        }
+    } else {
+        try std.fs.File.stderr().deprecatedWriter().print("Error: Could not find version tag in GitHub response.\n", .{});
+    }
+}
+
+fn handleUninstall(allocator: std.mem.Allocator) !void {
+    const home = std.posix.getenv("HOME") orelse {
+        try std.fs.File.stderr().deprecatedWriter().print("Error: HOME environment variable not set.\n", .{});
+        return;
+    };
+
+    try std.fs.File.stdout().deprecatedWriter().print("\xf0\x9f\x8c\x8c Starting OMNI Uninstall...\n", .{});
+
+    // 1. Clean up known Agent MCP Configs using Node.js (guaranteed available)
+    const agent_configs = [_]struct { rel: []const u8, label: []const u8 }{
+        .{ .rel = ".gemini/antigravity/mcp_config.json", .label = "Antigravity (Google)" },
+        .{ .rel = ".claude/mcp_config.json", .label = "Claude Code CLI" },
+        .{ .rel = "Library/Application Support/Claude/claude_desktop_config.json", .label = "Claude Desktop" },
+    };
+
+    for (agent_configs) |cfg| {
+        const full_path = std.fs.path.join(allocator, &.{ home, cfg.rel }) catch continue;
+        defer allocator.free(full_path);
+
+        // Check if file exists and contains "omni"
+        const file_content = blk: {
+            const f = std.fs.openFileAbsolute(full_path, .{}) catch continue;
+            defer f.close();
+            break :blk f.readToEndAlloc(allocator, 1024 * 1024) catch continue;
+        };
+        defer allocator.free(file_content);
+
+        if (std.mem.indexOf(u8, file_content, "\"omni\"") == null) continue;
+
+        // Use node to safely remove the "omni" key from mcpServers
+        const node_script = std.fmt.allocPrint(allocator,
+            \\const fs=require('fs');
+            \\try{{const p='{s}';const c=JSON.parse(fs.readFileSync(p,'utf8'));
+            \\if(c.mcpServers&&c.mcpServers.omni){{delete c.mcpServers.omni;
+            \\fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');
+            \\process.stdout.write('ok')}}}}catch(e){{}}
+        , .{full_path}) catch continue;
+        defer allocator.free(node_script);
+
+        const result = std.process.Child.run(.{
+            .allocator = allocator,
+            .argv = &.{ "node", "-e", node_script },
+        }) catch continue;
+        defer allocator.free(result.stdout);
+        defer allocator.free(result.stderr);
+
+        if (std.mem.eql(u8, result.stdout, "ok")) {
+            try std.fs.File.stdout().deprecatedWriter().print("\xe2\x9c\x85 Removed 'omni' from {s}\n", .{cfg.label});
+        }
+    }
+
+    // 2. Remove ~/.omni directory
+    const omni_dir = std.fs.path.join(allocator, &.{ home, ".omni" }) catch null;
+    if (omni_dir) |dir| {
+        defer allocator.free(dir);
+        std.fs.deleteTreeAbsolute(dir) catch |err| {
+            if (err != error.FileNotFound) {
+                try std.fs.File.stderr().deprecatedWriter().print("Warn: Failed to delete {s} ({any})\n", .{ dir, err });
+            }
+        };
+        try std.fs.File.stdout().deprecatedWriter().print("\xe2\x9c\x85 Cleaned up ~/.omni directory\n", .{});
+    }
+
+    try std.fs.File.stdout().deprecatedWriter().print("\n\xe2\x9c\xa8 OMNI has been successfully uninstalled.\n", .{});
+    try std.fs.File.stdout().deprecatedWriter().print("Note: If you installed via Homebrew, also run: brew uninstall omni\n", .{});
+}
+
 
 test "compressor integration" {
     const gpa = std.testing.allocator;

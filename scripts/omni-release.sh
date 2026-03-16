@@ -23,6 +23,7 @@ sed -i '' "s|tags/v.*.tar.gz|tags/$TAG.tar.gz|g" omni.rb
 # 2. Update Dynamic Versioning across all components
 # Zig metadata
 sed -i '' "s|\.version = \".*\"|.version = \"$VERSION\"|" core/build.zig.zon
+sed -i '' "s|break :v \".*\"|break :v \"$VERSION\"|" core/build.zig
 
 # Node.js metadata (also updates package-lock.json)
 npm version "$VERSION" --no-git-tag-version

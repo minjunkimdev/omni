@@ -1,0 +1,10 @@
+{
+  "name": "omni-landing",
+  "public": true,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/page/$1"
+    }
+  ]
+}

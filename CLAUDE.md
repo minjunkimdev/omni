@@ -21,6 +21,8 @@ This file provides guidance to Claude Code when working in the **OMNI** reposito
 - `omni bench` - Run performance benchmark
 - `omni generate` - Output agent templates
 - `omni setup` - Integration & setup guide
+- `omni update` - Check for the latest version from GitHub
+- `omni uninstall` - Remove OMNI and clean up all MCP configs
 
 ### MCP Interface (TypeScript)
 - `npm install` - Install dependencies

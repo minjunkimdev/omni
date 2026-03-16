@@ -36,20 +36,36 @@ If you prefer to install manually:
 
 3. **Verify via Native CLI**:
    ```bash
-   ./bin/omni report
+   ./bin/omni --version
    ./bin/omni setup
    ```
+
+## Update
+
+Check for the latest version:
+```bash
+omni update
+```
+OMNI will auto-detect your installation method and suggest the right update command.
+
+## Uninstall
+
+Cleanly remove OMNI and all its configurations:
+```bash
+omni uninstall
+```
+This removes `~/.omni` and cleans the `omni` entry from all known MCP agent configs (Antigravity, Claude Code CLI, Claude Desktop).
 
 ## Integration with AI Agents
 
 OMNI is compatible with any tool that supports the **Model Context Protocol (MCP)**.
 
 ### Claude Code / Antigravity
-The OMNI CLI is for humans, but **`omni-mcp`** is for your AI. It allows Claude or Antigravity to use OMNI's distillation tools automatically.
-
-To connect OMNI to Claude Code:
+Use the built-in generators to auto-configure MCP:
 ```bash
-claude config add mcp omni omni-mcp
+omni generate claude-code     # For Claude Code / Claude CLI
+omni generate antigravity      # For Google Antigravity
+omni setup                     # Full interactive guide
 ```
 
 > [!NOTE]

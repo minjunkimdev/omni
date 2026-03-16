@@ -9,6 +9,11 @@ Project OMNI is on a mission to redefine how AI models consume information. This
 - [x] MCP Server integration for Claude Code & Antigravity.
 - [x] Tiered LRU + TTL caching layer.
 - [x] Universal one-line installer.
+- [x] **Self-Update**: `omni update` checks GitHub Releases for new versions.
+- [x] **Clean Uninstall**: `omni uninstall` removes `~/.omni` and all MCP configs.
+- [x] **Telemetry & Reporting**: `omni report` with daily/weekly/monthly breakdowns.
+- [x] **Homebrew Stable Paths**: Upgrade-safe symlinks for `brew upgrade`.
+- [x] **Automated Release**: Single-command release script syncing 9 versioned locations.
 
 ## Phase 2: Intelligence Expansion (In-Progress)
 - [ ] **Native Filter DSL**: Move from hardcoded filters to a lightweight declarative format.
@@ -31,4 +36,4 @@ Project OMNI is on a mission to redefine how AI models consume information. This
 
 ---
 
-*The window to the future is narrow; OMNI makes it wider.* 🌌
+*The window to the future is narrow; OMNI makes it wider.*
