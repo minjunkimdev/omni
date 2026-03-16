@@ -27,7 +27,11 @@ pub const CustomFilter = struct {
 
         const content = try file.readToEndAlloc(allocator, 1024 * 64);
         errdefer allocator.free(content);
+        
+        return try initFromContent(allocator, content);
+    }
 
+    pub fn initFromContent(allocator: std.mem.Allocator, content: []const u8) !*CustomFilter {
         const config = try std.json.parseFromSlice(Config, allocator, content, .{ .ignore_unknown_fields = true });
         errdefer config.deinit();
         
@@ -35,7 +39,7 @@ pub const CustomFilter = struct {
         self.* = .{
             .allocator = allocator,
             .config = config,
-            .content = content,
+            .content = try allocator.dupe(u8, content),
         };
         return self;
     }

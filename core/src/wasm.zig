@@ -34,27 +34,27 @@ export fn init_engine() bool {
     filters.append(allocator, SqlFilter.filter()) catch return false;
     filters.append(allocator, NodeFilter.filter()) catch return false;
 
-    // Optional: Load custom rules if config exists in Wasm environment (might need pre-opened file)
-    // Optional: Load custom rules
-    if (CustomFilter.init(allocator, "omni_config.json")) |custom| {
-        global_custom_filter = custom;
-        filters.append(allocator, custom.filter()) catch {};
+    // Load Config (Custom Rules & DSL Filters)
+    const content = std.fs.cwd().readFileAlloc(allocator, "omni_config.json", 1024 * 64) catch null;
+    if (content) |raw_json| {
+        defer allocator.free(raw_json);
         
-        // Try to load DSL filters from the same config if present
-        // In a real impl, we'd parse the full JSON once, but for simplicity:
-        const FullConfig = struct { dsl_filters: []DslFilterConfig };
-        const content = std.fs.cwd().readFileAlloc(allocator, "omni_config.json", 1024 * 64) catch null;
-        if (content) |raw_json| {
-            defer allocator.free(raw_json);
-            if (std.json.parseFromSlice(FullConfig, allocator, raw_json, .{ .ignore_unknown_fields = true })) |parsed| {
-                if (DslEngine.init(allocator, parsed.value.dsl_filters)) |engine| {
-                    global_dsl_engine = engine;
-                    engine.getFilters(&filters) catch {};
-                } else |_| {}
-                parsed.deinit();
+        // Load Legacy/Custom Rules
+        if (CustomFilter.initFromContent(allocator, raw_json)) |custom| {
+            global_custom_filter = custom;
+            filters.append(allocator, custom.filter()) catch {};
+        } else |_| {}
+
+        // Load DSL Filters
+        const FullConfig = struct { dsl_filters: []DslFilterConfig = &[_]DslFilterConfig{} };
+        if (std.json.parseFromSlice(FullConfig, allocator, raw_json, .{ .ignore_unknown_fields = true })) |parsed| {
+            defer parsed.deinit();
+            if (DslEngine.init(allocator, parsed.value.dsl_filters)) |engine| {
+                global_dsl_engine = engine;
+                _ = engine.getFilters(&filters) catch {};
             } else |_| {}
-        }
-    } else |_| {}
+        } else |_| {}
+    }
 
     global_filters = filters;
     return true;

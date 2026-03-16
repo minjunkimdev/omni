@@ -38,7 +38,7 @@ pub const DslEngine = struct {
 
     pub fn getFilters(self: *DslEngine, list: *std.ArrayList(Filter)) !void {
         for (self.filters) |*f| {
-            try list.append(.{
+            try list.append(self.allocator, .{
                 .name = f.name,
                 .ptr = f,
                 .matchFn = match,
@@ -82,33 +82,49 @@ pub const DslEngine = struct {
 
     fn captureVariables(allocator: std.mem.Allocator, input: []const u8, pattern: []const u8, vars: *std.StringHashMap([]const u8)) !bool {
         _ = allocator;
-        // Simplified capture: looks for {var} and tries to match literal parts around it
-        // Example: "On branch {branch}" matches "On branch main" -> branch=main
-        if (std.mem.indexOf(u8, pattern, "{")) |start_idx| {
-            if (std.mem.indexOf(u8, pattern[start_idx..], "}")) |end_rel| {
-                const end_idx = start_idx + end_rel;
-                const prefix = pattern[0..start_idx];
-                const var_name = pattern[start_idx + 1 .. end_idx];
-                const suffix = pattern[end_idx + 1 ..];
+        var input_idx: usize = 0;
+        var pattern_idx: usize = 0;
 
-                if (std.mem.startsWith(u8, input, prefix)) {
-                    const remain = input[prefix.len..];
-                    if (suffix.len == 0) {
-                        try vars.put(var_name, remain);
-                        return true;
-                    } else if (std.mem.indexOf(u8, remain, suffix)) |s_idx| {
-                        try vars.put(var_name, remain[0..s_idx]);
-                        return true;
-                    }
+        while (pattern_idx < pattern.len) {
+            if (pattern[pattern_idx] == '{') {
+                const end_rel = std.mem.indexOf(u8, pattern[pattern_idx..], "}") orelse return false;
+                const end_idx = pattern_idx + end_rel;
+                const var_name = pattern[pattern_idx + 1 .. end_idx];
+                
+                pattern_idx = end_idx + 1;
+                
+                // If there's more pattern after }, find the next literal part
+                if (pattern_idx < pattern.len) {
+                    const next_brace = std.mem.indexOf(u8, pattern[pattern_idx..], "{") orelse pattern.len - pattern_idx;
+                    const literal_suffix = pattern[pattern_idx .. pattern_idx + next_brace];
+                    
+                    if (std.mem.indexOf(u8, input[input_idx..], literal_suffix)) |match_idx| {
+                        try vars.put(var_name, input[input_idx .. input_idx + match_idx]);
+                        input_idx += match_idx + literal_suffix.len;
+                        pattern_idx += literal_suffix.len;
+                    } else return false;
+                } else {
+                    // Last variable captures the rest of the input
+                    try vars.put(var_name, input[input_idx..]);
+                    input_idx = input.len;
                 }
+            } else {
+                // Match literal prefix or parts between variables
+                const next_brace = std.mem.indexOf(u8, pattern[pattern_idx..], "{") orelse pattern.len - pattern_idx;
+                const literal = pattern[pattern_idx .. pattern_idx + next_brace];
+                
+                if (!std.mem.startsWith(u8, input[input_idx..], literal)) return false;
+                
+                input_idx += literal.len;
+                pattern_idx += literal.len;
             }
         }
-        return false;
+        return true;
     }
 
     fn formatOutput(allocator: std.mem.Allocator, template: []const u8, vars: *std.StringHashMap([]const u8), counters: *std.StringHashMap(usize)) ![]u8 {
-        var result = std.ArrayList(u8).init(allocator);
-        errdefer result.deinit();
+        var result = std.ArrayList(u8).empty;
+        errdefer result.deinit(allocator);
 
         var i: usize = 0;
         while (i < template.len) {
@@ -118,21 +134,21 @@ pub const DslEngine = struct {
                     const key = template[i + 1 .. end_idx];
                     
                     if (vars.get(key)) |val| {
-                        try result.appendSlice(val);
+                        try result.appendSlice(allocator, val);
                     } else if (counters.get(key)) |count| {
                         var buf: [32]u8 = undefined;
                         const s = std.fmt.bufPrint(&buf, "{d}", .{count}) catch "???";
-                        try result.appendSlice(s);
+                        try result.appendSlice(allocator, s);
                     } else {
-                        try result.appendSlice(template[i .. end_idx + 1]);
+                        try result.appendSlice(allocator, template[i .. end_idx + 1]);
                     }
                     i = end_idx + 1;
                     continue;
                 }
             }
-            try result.append(template[i]);
+            try result.append(allocator, template[i]);
             i += 1;
         }
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(allocator);
     }
 };
