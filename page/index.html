@@ -55,9 +55,15 @@
 
       <!-- One-Line Installer -->
       <div class="install-box">
-        <code><span class="prefix">$</span> curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh</code>
-        <button class="copy-btn" data-copy="curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh">
-          📋 Copy
+        <code><span class="prefix">$</span> curl -fsSL omni-nine-rho.vercel.app/install | sh</code>
+        <button class="copy-btn" data-copy="curl -fsSL https://omni-nine-rho.vercel.app/install | sh">
+          Copy
+        </button>
+      </div>
+      <div class="install-box" style="margin-left: 12px;">
+        <code><span class="prefix">$</span> brew install fajarhide/tap/omni</code>
+        <button class="copy-btn" data-copy="brew install fajarhide/tap/omni">
+          Copy
         </button>
       </div>
 
@@ -362,10 +368,21 @@ Step 15/15 : CMD ["node", "server.js"]
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-zap"><path d="M4 14.71 14 3.5v9h6l-10 11.21v-9H4Z"/></svg>
             One-Line Installer
           </h3>
-          <p>Fastest way to get started — clones, builds the Zig core + Wasm, and sets everything up automatically.</p>
+          <p>Fastest way to get started via optimized global redirect.</p>
           <div class="code-block">
-            <button class="code-copy" data-copy="curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh">Copy</button>
-            curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh
+            <button class="code-copy" data-copy="curl -fsSL https://omni-nine-rho.vercel.app/install | sh">Copy</button>
+            curl -fsSL omni-nine-rho.vercel.app/install | sh
+          </div>
+        </div>
+        <div class="integration-card">
+          <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            Homebrew (Recommended)
+          </h3>
+          <p>Install OMNI and its core components via Homebrew on macOS or Linux.</p>
+          <div class="code-block">
+            <button class="code-copy" data-copy="brew install fajarhide/tap/omni">Copy</button>
+            brew install fajarhide/tap/omni
           </div>
         </div>
         <div class="integration-card">

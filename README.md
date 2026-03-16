@@ -278,9 +278,9 @@ While other tools focus on simple filtering, OMNI provides a full semantic layer
 brew install fajarhide/tap/omni
 ```
 
-### One-Line Installer
+### One-Line Installer (Optimized)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fajarhide/omni/main/install.sh | sh
+curl -fsSL https://omni-nine-rho.vercel.app/install | sh
 ```
 
 For manual build instructions, see **[INSTALL.md](INSTALL.md)**.
