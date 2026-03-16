@@ -1,0 +1,26 @@
+name: AI Pull Request Describer
+
+on:
+  pull_request:
+    types: [reopened, labeled]
+
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: AI Pull Request Describer
+        uses: fajarhide/ai-pr-describer@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-api-base-url: 'https://api.github.com' 
+          openai-api-key: ${{ secrets.AI_API_KEY }}
+          openai-model: '${{ secrets.MODEL }}'
+          openai-base-url: '${{ secrets.API_URL }}'
