@@ -11,14 +11,41 @@ import { exec } from "child_process";
 import { fileURLToPath } from "url";
 import { WASI } from "wasi";
 import { LRUCache } from "./cache.js";
+import os from "os";
 
 const execAsync = promisify(exec);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Parse Agent Argument (--agent=claude-code)
+let currentAgent = "unknown";
+for (const arg of process.argv) {
+  if (arg.startsWith("--agent=")) {
+    currentAgent = arg.split("=")[1] || "unknown";
+  }
+}
+
+// Telemetry Logic
+const TELEMETRY_FILE = path.join(os.homedir(), ".omni", "telemetry.csv");
+
+async function logTelemetry(inputLen: number, outputLen: number, ms: number) {
+  try {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const line = `${timestamp},${currentAgent},${inputLen},${outputLen},${Math.round(ms)}\n`;
+    
+    // Ensure .omni directory exists
+    const dir = path.dirname(TELEMETRY_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    await fs.promises.appendFile(TELEMETRY_FILE, line);
+  } catch (e) {
+    // Ignore logging errors to remain transparent
+  }
+}
+
 const server = new Server(
   {
     name: "omni-server",
-    version: "0.1.1",
+    version: "0.3.8",
   },
   {
     capabilities: {
@@ -63,8 +90,12 @@ async function getWasmInstance() {
 
 // Helper: Distill text via OMNI Wasm engine
 async function distillText(text: string): Promise<string> {
+  const startTime = performance.now();
   const cached = cache.get(text);
-  if (cached) return cached;
+  if (cached) {
+    await logTelemetry(text.length, cached.length, performance.now() - startTime);
+    return cached;
+  }
 
   const instance = await getWasmInstance();
   const exports = instance.exports as any;
@@ -94,6 +125,10 @@ async function distillText(text: string): Promise<string> {
 
   const trimmed = output.trim();
   cache.set(text, trimmed);
+  
+  const elapsed = performance.now() - startTime;
+  await logTelemetry(text.length, trimmed.length, elapsed);
+  
   return trimmed;
 }
 

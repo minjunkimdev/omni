@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const compressor = @import("compressor.zig");
+const telemetry = @import("telemetry.zig");
 const Filter = @import("filters/interface.zig").Filter;
 const GitFilter = @import("filters/git.zig").GitFilter;
 const BuildFilter = @import("filters/build.zig").BuildFilter;
@@ -49,7 +50,11 @@ pub fn main() !void {
             try handleDensity(allocator, filters.items);
             return;
         } else if (std.mem.eql(u8, cmd, "report")) {
-            try handleReport(allocator, filters.items);
+            var filter_agent: ?[]const u8 = null;
+            if (args.len > 2 and std.mem.startsWith(u8, args[2], "--agent=")) {
+                filter_agent = args[2][8..];
+            }
+            try handleReport(allocator, filter_agent);
             return;
         } else if (std.mem.eql(u8, cmd, "bench")) {
             var iterations: usize = 100;
@@ -107,9 +112,37 @@ fn handleDistill(allocator: std.mem.Allocator, filters: []const Filter) !void {
         std.process.exit(1);
     }
 
+    var timer = try std.time.Timer.start();
     const compressed = try compressor.compress(allocator, input, filters);
+    const elapsed = timer.read() / std.time.ns_per_ms;
     defer allocator.free(compressed);
     try std.fs.File.stdout().deprecatedWriter().print("{s}\n", .{compressed});
+    
+    // Log telemetry for native CLI usage
+    logTelemetry(allocator, "CLI", input.len, compressed.len, elapsed) catch {};
+}
+
+fn logTelemetry(allocator: std.mem.Allocator, agent: []const u8, input_len: usize, output_len: usize, ms: u64) !void {
+    const home = std.posix.getenv("HOME") orelse return;
+    const omni_dir = try std.fmt.allocPrint(allocator, "{s}/.omni", .{home});
+    defer allocator.free(omni_dir);
+    
+    std.fs.cwd().makeDir(omni_dir) catch {};
+    
+    const file_path = try std.fmt.allocPrint(allocator, "{s}/telemetry.csv", .{omni_dir});
+    defer allocator.free(file_path);
+
+    const file = std.fs.cwd().openFile(file_path, .{ .mode = .read_write }) catch |err| switch (err) {
+        error.FileNotFound => try std.fs.cwd().createFile(file_path, .{}),
+        else => return,
+    };
+    defer file.close();
+
+    try file.seekFromEnd(0);
+    const ts = std.time.timestamp();
+    const line = try std.fmt.allocPrint(allocator, "{d},{s},{d},{d},{d}\n", .{ ts, agent, input_len, output_len, ms });
+    defer allocator.free(line);
+    try file.writeAll(line);
 }
 
 fn handleDensity(allocator: std.mem.Allocator, filters: []const Filter) !void {
@@ -131,29 +164,168 @@ fn handleDensity(allocator: std.mem.Allocator, filters: []const Filter) !void {
     try stdout.print("\x1b[0;32mContext Density Gain: {d:.2}x\x1b[0m\n", .{gain});
 }
 
-fn handleReport(allocator: std.mem.Allocator, filters: []const Filter) !void {
+fn handleReport(allocator: std.mem.Allocator, filter_agent: ?[]const u8) !void {
     const stdout = std.fs.File.stdout().deprecatedWriter();
-    try stdout.print("\n\x1b[0;35m\x1b[1m🌌 OMNI Unified Intelligence Report\x1b[0m\n", .{});
-    try stdout.print("══════════════════════════════════════════════════════════\n", .{});
+    
+    // Parse Telemetry Data
+    const home = std.posix.getenv("HOME") orelse return;
+    const file_path = try std.fmt.allocPrint(allocator, "{s}/.omni/telemetry.csv", .{home});
+    defer allocator.free(file_path);
 
-    // 1. System Status
-    try stdout.print("\n\x1b[0;34m\x1b[1m🔧 [1/3] SYSTEM STATUS\x1b[0m\n", .{});
-    try stdout.print("  Native Engine:   \x1b[0;32mONLINE\x1b[0m (Zig)\n", .{});
-    try stdout.print("  Active Filters:  {d} (Git, Build, Docker, SQL, Node, Custom)\n", .{filters.len});
+    var daily_map = std.StringHashMap(telemetry.Stats).init(allocator);
+    var weekly_map = std.StringHashMap(telemetry.Stats).init(allocator);
+    var monthly_map = std.StringHashMap(telemetry.Stats).init(allocator);
+    defer daily_map.deinit();
+    defer weekly_map.deinit();
+    defer monthly_map.deinit();
 
-    // 2. Sample Performance
-    const sample = "Step 1/5 : FROM node:18\n ---> 1234\nCACHED\nStep 2/5 : RUN npm install\n[DEBUG] trace...\nSuccessfully built";
-    const compressed = try compressor.compress(allocator, sample, filters);
-    defer allocator.free(compressed);
+    var global_cmds: usize = 0;
+    var global_in: usize = 0;
+    var global_out: usize = 0;
+    var global_saved: usize = 0;
+    var global_ms: u64 = 0;
 
-    const reduction = (1.0 - (@as(f32, @floatFromInt(compressed.len)) / @as(f32, @floatFromInt(sample.len)))) * 100.0;
-    try stdout.print("\n\x1b[0;34m\x1b[1m🧠 [2/3] PERFORMANCE METRICS\x1b[0m\n", .{});
-    try stdout.print("  Sample Reduction: {d:.1}% (Signal: High)\n", .{reduction});
+    if (std.fs.cwd().openFile(file_path, .{})) |file| {
+        defer file.close();
+        
+        const data = file.readToEndAlloc(allocator, 10 * 1024 * 1024) catch return;
+        defer allocator.free(data);
 
-    // 3. Recommendation
-    try stdout.print("\n\x1b[0;34m\x1b[1m🚀 [3/3] PROJECT STATUS\x1b[0m\n", .{});
-    try stdout.print("  Status:          \x1b[0;32mMission-Ready\x1b[0m\n", .{});
-    try stdout.print("══════════════════════════════════════════════════════════\n\n", .{});
+        var it_lines = std.mem.splitSequence(u8, data, "\n");
+        while (it_lines.next()) |line| {
+            if (line.len == 0) continue;
+            const rec = telemetry.parseCsvLine(allocator, line) catch continue;
+            defer allocator.free(rec.agent);
+
+            if (filter_agent != null and !std.mem.eql(u8, rec.agent, filter_agent.?)) {
+                continue;
+            }
+
+            global_cmds += 1;
+            global_in += rec.input_bytes;
+            global_out += rec.output_bytes;
+            if (rec.input_bytes > rec.output_bytes) global_saved += (rec.input_bytes - rec.output_bytes);
+            global_ms += rec.ms;
+
+            const d_lbl = try telemetry.toDailyLabel(allocator, rec.timestamp);
+            const w_lbl = try telemetry.toWeeklyLabel(allocator, rec.timestamp);
+            const m_lbl = try telemetry.toMonthlyLabel(allocator, rec.timestamp);
+            defer allocator.free(d_lbl);
+            defer allocator.free(w_lbl);
+            defer allocator.free(m_lbl);
+
+            var d_res = try daily_map.getOrPut(d_lbl);
+            if (!d_res.found_existing) {
+                d_res.value_ptr.* = .{};
+                d_res.key_ptr.* = try allocator.dupe(u8, d_lbl);
+            }
+            d_res.value_ptr.add(rec);
+
+            var w_res = try weekly_map.getOrPut(w_lbl);
+            if (!w_res.found_existing) {
+                w_res.value_ptr.* = .{};
+                w_res.key_ptr.* = try allocator.dupe(u8, w_lbl);
+            }
+            w_res.value_ptr.add(rec);
+
+            var m_res = try monthly_map.getOrPut(m_lbl);
+            if (!m_res.found_existing) {
+                m_res.value_ptr.* = .{};
+                m_res.key_ptr.* = try allocator.dupe(u8, m_lbl);
+            }
+            m_res.value_ptr.add(rec);
+        }
+    } else |_| {}
+
+    // Function to render a single table
+    const renderTable = struct {
+        fn do(alloc: std.mem.Allocator, map: *std.StringHashMap(telemetry.Stats), title: []const u8, out: anytype, rowTitle: []const u8, g_cmds: usize, g_in: usize, g_out: usize, g_s: usize, g_ms: u64) !void {
+            try out.print("\n\x1b[1m📅 {s} ({d} entries)\x1b[0m\n", .{ title, map.count() });
+            try out.print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", .{});
+            try out.print("{s:<15} {s:>6} {s:>10} {s:>10} {s:>10} {s:>7} {s:>7}\n", .{ rowTitle, "Cmds", "Input", "Output", "Saved", "Save%", "Time" });
+            try out.print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", .{});
+
+            var iter = map.iterator();
+            // Collect and sort
+            var rows: std.ArrayList(telemetry.GroupedStats) = .empty;
+            defer rows.deinit(alloc);
+            while (iter.next()) |entry| {
+                try rows.append(alloc, .{ .label = entry.key_ptr.*, .stats = entry.value_ptr.* });
+            }
+
+            // Simple bubble sort for demonstration based on label logic (assume string sort matches chronologically here)
+            for (0..rows.items.len) |i| {
+                for (0..rows.items.len - i - 1) |j| {
+                    if (std.mem.order(u8, rows.items[j].label, rows.items[j + 1].label) == .gt) {
+                        const temp = rows.items[j];
+                        rows.items[j] = rows.items[j + 1];
+                        rows.items[j + 1] = temp;
+                    }
+                }
+            }
+
+            for (rows.items) |row| {
+                const s = row.stats;
+                const in_str = try telemetry.formatBytes(alloc, s.input);
+                const out_str = try telemetry.formatBytes(alloc, s.output);
+                const s_str = try telemetry.formatBytes(alloc, s.saved);
+                const ms_str = try telemetry.formatMs(alloc, s.ms, s.cmds);
+                defer alloc.free(in_str);
+                defer alloc.free(out_str);
+                defer alloc.free(s_str);
+                defer alloc.free(ms_str);
+
+                const save_pct = if (s.input > 0)
+                    (@as(f64, @floatFromInt(s.saved)) / @as(f64, @floatFromInt(s.input))) * 100.0
+                else
+                    0.0;
+
+                try out.print("{s:<15} {d:>6} {s:>10} {s:>10} {s:>10} {d:>5.1}% {s:>7}\n", .{
+                    row.label, s.cmds, in_str, out_str, s_str, save_pct, ms_str,
+                });
+            }
+
+            try out.print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n", .{});
+            
+            const gin_str = try telemetry.formatBytes(alloc, g_in);
+            const gout_str = try telemetry.formatBytes(alloc, g_out);
+            const gs_str = try telemetry.formatBytes(alloc, g_s);
+            const gms_str = try telemetry.formatMs(alloc, g_ms, g_cmds);
+            defer alloc.free(gin_str);
+            defer alloc.free(gout_str);
+            defer alloc.free(gs_str);
+            defer alloc.free(gms_str);
+            
+            const g_pct = if (g_in > 0)
+                    (@as(f64, @floatFromInt(g_s)) / @as(f64, @floatFromInt(g_in))) * 100.0
+                else
+                    0.0;
+
+            try out.print("\x1b[1m{s:<15} {d:>6} {s:>10} {s:>10} {s:>10} {d:>5.1}% {s:>7}\x1b[0m\n", .{
+                "TOTAL", g_cmds, gin_str, gout_str, gs_str, g_pct, gms_str,
+            });
+        }
+    }.do;
+
+    try stdout.print("\n\x1b[0;35m\x1b[1mOMNI Context Telemetry Report\x1b[0m\n", .{});
+    if (filter_agent) |ag| {
+        try stdout.print("Filtering by Agent: \x1b[0;32m{s}\x1b[0m\n", .{ag});
+    } else {
+        try stdout.print("Aggregate across all agents and CLI usages\n", .{});
+    }
+
+    try renderTable(allocator, &daily_map, "Daily Breakdown", stdout, "Date", global_cmds, global_in, global_out, global_saved, global_ms);
+    try renderTable(allocator, &weekly_map, "Weekly Breakdown", stdout, "Week", global_cmds, global_in, global_out, global_saved, global_ms);
+    try renderTable(allocator, &monthly_map, "Monthly Breakdown", stdout, "Month", global_cmds, global_in, global_out, global_saved, global_ms);
+    try stdout.print("\n", .{});
+
+    // Cleanup keys
+    var it = daily_map.keyIterator();
+    while (it.next()) |k| allocator.free(k.*);
+    var wit = weekly_map.keyIterator();
+    while (wit.next()) |k| allocator.free(k.*);
+    var mit = monthly_map.keyIterator();
+    while (mit.next()) |k| allocator.free(k.*);
 }
 
 fn handleBench(allocator: std.mem.Allocator, iterations: usize, filters: []const Filter) !void {
@@ -201,7 +373,7 @@ fn handleGenerate(agent: []const u8) !void {
             \\
         , .{});
 
-        const command_json = try std.fmt.allocPrint(alloc, "{{\"type\":\"stdio\",\"command\":\"node\",\"args\":[\"{s}\"]}}", .{absolute_omni_path});
+        const command_json = try std.fmt.allocPrint(alloc, "{{\"type\":\"stdio\",\"command\":\"node\",\"args\":[\"{s}\", \"--agent=claude-code\"]}}", .{absolute_omni_path});
         const argv = [_][]const u8{ "claude", "mcp", "add-json", "omni", command_json };
         
         const run_result = std.process.Child.run(.{
@@ -293,6 +465,7 @@ fn autoConfigureAntigravity(alloc: std.mem.Allocator, home: []const u8, absolute
     
     var args_array_val = std.json.Array.init(alloc);
     try args_array_val.append(std.json.Value{ .string = absolute_omni_path });
+    try args_array_val.append(std.json.Value{ .string = "--agent=antigravity" });
     try omni_obj.put("args", std.json.Value{ .array = args_array_val });
 
     // Inject into mcpServers and root
@@ -335,20 +508,29 @@ fn handleSetup() !void {
 
             var buffer: [std.fs.max_path_bytes]u8 = undefined;
             if (std.fs.selfExeDirPath(&buffer)) |exe_dir| {
-                const src_dist1 = std.fs.path.join(alloc, &.{ exe_dir, "..", "dist", "index.js" }) catch null;
-                const src_dist2 = std.fs.path.join(alloc, &.{ exe_dir, "..", "libexec", "dist", "index.js" }) catch null;
+                // Search candidate paths for index.js
+                const candidates = [_]?[]const u8{
+                    std.fs.path.join(alloc, &.{ exe_dir, "..", "dist", "index.js" }) catch null,
+                    std.fs.path.join(alloc, &.{ exe_dir, "..", "libexec", "dist", "index.js" }) catch null,
+                    std.fs.path.join(alloc, &.{ exe_dir, "..", "libexec", "src", "index.js" }) catch null,
+                    std.fs.path.join(alloc, &.{ exe_dir, "..", "src", "index.js" }) catch null,
+                };
                 
                 var real_src_dist: ?[]const u8 = null;
-                if (src_dist1) |d1| {
-                    if (std.fs.cwd().access(d1, .{})) |_| { real_src_dist = d1; } else |_| {}
-                }
-                if (real_src_dist == null and src_dist2 != null) {
-                    if (std.fs.cwd().access(src_dist2.?, .{})) |_| { real_src_dist = src_dist2.?; } else |_| {}
+                for (&candidates) |candidate| {
+                    if (candidate) |c| {
+                        if (std.fs.cwd().access(c, .{})) |_| {
+                            real_src_dist = c;
+                            break;
+                        } else |_| {}
+                    }
                 }
 
                 if (real_src_dist != null) {
                     const dst_dist = std.fmt.allocPrint(alloc, "{s}/index.js", .{omni_dist_dir.?}) catch null;
                     if (dst_dist != null) {
+                        // Remove stale symlink if exists
+                        std.posix.unlink(dst_dist.?) catch {};
                         std.posix.symlink(real_src_dist.?, dst_dist.?) catch {};
                     }
                 }

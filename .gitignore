@@ -10,6 +10,7 @@ core/omni-wasm.wasm
 core/*.o
 *.wasm
 *.o
+bin/*
 
 # --- Logs & Temporary Files ---
 *.log
@@ -29,8 +30,3 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
-
-# --- Internal Documents ---
-ROADMAP.md
-ARCHITECTURE.md
-omni-release.sh
