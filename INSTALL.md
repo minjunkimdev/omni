@@ -57,6 +57,22 @@ omni uninstall
 ```
 This removes `~/.omni` and cleans the `omni` entry from all known MCP agent configs (Antigravity, Claude Code CLI, Claude Desktop).
 
+## Configuration Setup
+
+OMNI uses an additive configuration hierarchy.
+
+1.  **Global Config**: Located at `~/.omni/omni_config.json`. This is where you should keep your general rules.
+2.  **Local Config**: Create an `omni_config.json` in your project root for project-specific overrides.
+
+Example `omni_config.json`:
+```json
+{
+  "rules": [
+    { "name": "mask_prod_db", "match": "prod-db-01", "action": "mask" }
+  ]
+}
+```
+
 ## Integration with AI Agents
 
 OMNI is compatible with any tool that supports the **Model Context Protocol (MCP)**.

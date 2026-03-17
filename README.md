@@ -196,21 +196,54 @@ OMNI exposes high-density tools that replace standard agent context commands:
 
 You can extend OMNI's intelligence without touching a single line of Zig.
 
-### 1. Add Filter Instantly (via MCP)
-If you're using an AI agent (like Antigravity), just ask it to add a filter:
-> "Antigravity, please mask all text matching 'password' in my tool output."
-
-The agent will use `omni_add_filter` to update your `omni_config.json` instantly.
+The agent will use `omni_add_filter` to update your configuration instantly. It automatically prioritizes your project-local `omni_config.json` if it exists, otherwise it updates your global `~/.omni/omni_config.json`.
 
 ### 2. Apply Technology Templates
 Apply bundles of pre-defined rules for your stack via MCP tool:
 - **`omni_apply_template(template="terraform")`**
 - Supported templates: `kubernetes`, `terraform`, `node-verbose`, `docker-layers`.
 
-### 3. Create Your Own Semantic Filters (DSL)
-Want to build your own high-performance filters? OMNI now supports a **Declarative DSL** that lets you define complex distillation logic in `omni_config.json` without writing Zig.
-
 See the **[DSL_GUIDE.md](docs/DSL_GUIDE.md)** for full documentation and examples.
+
+---
+
+## ⚙️ Configuration Architecture
+
+OMNI uses a **dual-layer, additive configuration system** to provide both global consistency and project-specific flexibility.
+
+| Layer | Path | Purpose |
+| :--- | :--- | :--- |
+| **Global** | `~/.omni/omni_config.json` | Your primary rules, shared across all projects and agents. |
+| **Local** | `./omni_config.json` | Project-specific overrides or additional rules (e.g., custom masking for a specific repo). |
+
+### How Merging Works
+1. OMNI first loads the **Global** configuration.
+2. It then loads the **Local** configuration (if present in your current directory).
+3. The rules are **combined**. This means rules from both your global setup and your specific project will be applied simultaneously.
+
+### Manual Configuration
+You can manually edit these files to define `rules` (exact matching) or `dsl_filters` (complex semantic logic):
+```json
+{
+  "rules": [
+    { "name": "mask_token", "match": "api_key:", "action": "mask" }
+  ],
+  "dsl_filters": [
+    { "name": "my-custom-sig", "pattern": "MY_SIGNAL:", "confidence": 1.0 }
+  ]
+}
+```
+
+> [!TIP]
+> Use **`omni generate config`** to output a complete, well-commented starter template for your configuration.
+
+### Lifecycle: Creation & Editing
+| Event | Action |
+| :--- | :--- |
+| **Installation** | The `install.sh` script sets up your global `~/.omni/omni_config.json`. |
+| **AI Tooling** | Using MCP tools like `omni_add_filter` or `omni_apply_template` will automatically create the file if it doesn't exist. |
+| **Manual Edit** | You can edit both global and local files manually at any time using any text editor. |
+| **AI Proxy** | AI agents can dynamically add project-specific rules via the OMNI MCP interface without you leaving the chat. |
 
 ---
 

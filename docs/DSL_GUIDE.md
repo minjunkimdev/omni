@@ -2,105 +2,121 @@
 
 OMNI DSL (Declarative Semantic Language) allows you to transform chaotic tool output into high-density intelligence without writing a single line of Zig code.
 
-## Core Concepts
+---
 
-OMNI DSL works by scanning input for a **trigger** and then applying a set of **capture rules** to extract meaningful data which is then formatted into a final **output**.
-
-### 1. The Trigger
-The `trigger` is a unique string that tells OMNI, "Hey, this line (and the block it belongs to) is something I know how to distill."
-- **Good Trigger**: `"On branch"`, `"Step 1/"`, `"npm notice"`
-- **Bad Trigger**: `"a"`, `" "` (too common, hurts performance)
-
-### 2. Capture Rules (`rules`)
-Rules define how to extract variables from the noisy text.
-
-| Action | Description | Result |
-| :--- | :--- | :--- |
-| **`keep`** | Captures a substring into a variable. | `{branch} -> "main"` |
-| **`count`** | Increments a counter every time a pattern matches. | `{mod} -> 5` |
-
-### 3. Output Formatting
-The `output` string is your final distilled result. You can use `{variable_names}` anywhere in this string.
+## 🚀 Quick Start: Starter Template
+The easiest way to start is to generate a template using the CLI:
+```bash
+omni generate config > omni_config.json
+```
 
 ---
 
-## Practical Examples
+## 🏗️ Root Configuration Structure
+Your `omni_config.json` is organized into two primary sections:
 
-### Example A: Git Status (Built-in Reference)
-Turns 20 lines of `git status` into a 1-line summary.
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **`rules`** | `Array<Rule>` | Fast, exact-match filters (Global). Good for simple masking or removals. |
+| **`dsl_filters`** | `Array<DslFilter>` | Advanced semantic distillation blocks for multi-line context. |
 
-```json
-{
-  "name": "git-status-decl",
-  "trigger": "On branch",
-  "rules": [
-    { "capture": "On branch {branch}", "action": "keep" },
-    { "capture": "modified: {file}", "action": "count", "as": "mod" },
-    { "capture": "deleted: {file}", "action": "count", "as": "del" }
-  ],
-  "output": "git({branch}) | {mod} mod, {del} del"
-}
-```
+---
 
-### Example B: Build Log Optimizer
-Focus on what matters in a long build log.
+## 📚 Practical Examples: Deep Dive
+
+### 1. Docker Build Log Distillation
+**Purpose**: Docker builds generate hundreds of lines of "Removing intermediate container" or step metadata. OMNI collapses this into a single progress line.
 
 ```json
 {
-  "name": "build-summ",
+  "name": "docker-optimizer",
   "trigger": "Successfully built",
   "rules": [
     { "capture": "Step {curr}/{total}", "action": "keep" },
-    { "capture": "Removing intermediate container {id}", "action": "count", "as": "cleaned" }
+    { "capture": "Removing intermediate container {id}", "action": "count", "as": "cleans" }
   ],
-  "output": "Build Complete: {curr}/{total} steps | {cleaned} layers cleaned"
+  "output": "Docker: {curr}/{total} steps complete | {cleans} layers garbage-collected"
 }
 ```
+- **Logic**: It waits for the build completion message. Then it looks back to find how many steps there were and how many temporary layers it cleaned up.
+- **Result**: `100 lines` -> `Docker: 12/12 steps complete | 8 layers garbage-collected`.
 
-### Example C: AWS EC2 List Optimizer
-Turns heavy AWS CLI JSON/Table output into a lean status line.
+### 2. Kubernetes Pod Status Monitor
+**Purpose**: `kubectl get pods` displays a wide table. OMNI can distill it into a health-check signature.
 
 ```json
 {
-  "name": "aws-ec2-optimizer",
-  "trigger": "INSTANCE",
+  "name": "k8s-pod-check",
+  "trigger": "NAME",
   "rules": [
-    { "capture": "INSTANCE {id} {type} {state}", "action": "keep" }
+    { "capture": "{pod_name} {ready} {status} {restarts}", "action": "keep" }
   ],
-  "output": "EC2:{id} ({type}) -> {state}"
+  "output": "K8s health: {pod_name} is {status} (Restarts: {restarts})"
 }
 ```
+- **Logic**: Triggered by the header `NAME`. It captures the essential status columns into a human-ready (and agent-readable) format.
+- **Result**: `Wide table` -> `K8s health: api-server-v2 is Running (Restarts: 0)`.
 
-### Example D: Python Tracer
-Distills deep Python tracebacks into just the root cause and location.
+### 3. NPM/Yarn Security Audit Summary
+**Purpose**: Security audits are verbose. OMNI focuses only on the vulnerability counts.
 
 ```json
 {
-  "name": "python-error-distill",
-  "trigger": "Traceback",
+  "name": "npm-audit-distill",
+  "trigger": "vulnerabilities",
   "rules": [
-    { "capture": "File \"{file}\", line {line}, in {func}", "action": "keep" },
-    { "capture": "Error: {msg}", "action": "keep" }
+    { "capture": "{high} high", "action": "keep" },
+    { "capture": "{crit} critical", "action": "keep" }
   ],
-  "output": "PyError in {func} ({file}:{line}) | {msg}"
+  "output": "Security: {high} High, {crit} Critical vulns found."
 }
 ```
+- **Logic**: Scans for the summary line containing "vulnerabilities" and extracts only the severity counts.
+- **Result**: `Full report` -> `Security: 2 High, 0 Critical vulns found.`
 
----
+### 4. Test Runner (Jest/Vitest) Optimizer
+**Purpose**: Large test suites produce thousands of lines. Use OMNI to surface only the final result count.
 
-## Performance Tips
-
-OMNI is optimized for sub-millisecond latency. To keep it that way:
-1.  **Be Specific**: The more specific your `trigger`, the faster OMNI can skip irrelevant noise.
-2.  **Order Matters**: Place your most frequent patterns at the top of the `rules` list.
-3.  **No Overlap**: Avoid creating multiple filters with the same `trigger`.
-
-## Testing Your Filter
-Once you've added your filter to `core/omni_config.json`, simply run:
-```bash
-your_command | omni distill
+```json
+{
+  "name": "test-results",
+  "trigger": "Test Suites:",
+  "rules": [
+    { "capture": "{passed} passed", "action": "keep" },
+    { "capture": "{failed} failed", "action": "keep" }
+  ],
+  "output": "Tests: {passed} PASSED | {failed} FAILED"
+}
 ```
-OMNI will automatically reload the configuration and apply your new DSL rules.
+- **Logic**: Triggered by the "Test Suites:" summary line. Captures counts across all test files.
+- **Result**: `Massive log` -> `Tests: 142 PASSED | 0 FAILED`.
 
 ---
-*Powered by Zig. Optimized for Agents. Distilled for Intelligence.*
+
+## ⚙️ Advanced Features
+
+### 1. Variables & Captures
+Use curly braces: `{variable_name}` to extract text.
+- OMNI is greedy: it captures everything until the next literal in your pattern.
+- Patterns match line-by-line within the context window after a trigger.
+
+### 2. The `count` Action
+Increments a virtual counter for every match. Perfect for repetitive patterns (like log entries or deleted files).
+```json
+{ "capture": "modified: {file}", "action": "count", "as": "mod_count" }
+```
+
+### 3. Action Types
+- **`keep`**: Captures a string. If matched multiple times, the last one wins.
+- **`count`**: Increments an accumulator.
+
+---
+
+## 🛠️ Troubleshooting
+
+- **Trigger doesn't fire**: Check for hidden whitespace or special characters (colors/ANSI) in the raw output.
+- **Variables are empty**: Ensure there is a unique literal string before or after your `{variable}` so OMNI knows where it starts and ends.
+- **Too much output**: Use the global `rules` to `remove` lines before they hit the DSL engine.
+
+---
+*Powered by Zig. Distilled for Intelligence.*

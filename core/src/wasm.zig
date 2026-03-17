@@ -53,8 +53,9 @@ export fn init_engine_with_config(config_ptr: ?[*]u8, config_len: usize) bool {
 
     if (config_content) |raw_json| {
         // Load Legacy Custom Rules
-        if (CustomFilter.initFromContent(allocator, raw_json)) |custom| {
+        if (CustomFilter.init(allocator)) |custom| {
             global_custom_filter = custom;
+            custom.loadFromContent(raw_json) catch {};
             filters.append(allocator, custom.filter()) catch {};
         } else |_| {}
 

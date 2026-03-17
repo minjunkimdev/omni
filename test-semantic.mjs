@@ -42,9 +42,6 @@ async function runTest() {
         return Buffer.from(bytes).toString();
     }
 
-    const configPath = join(__dirname, 'core/omni_config.json');
-    const backupPath = join(__dirname, 'core/omni_config.json.bak');
-
     const testConfig = {
         dsl_filters: [
             {
@@ -75,14 +72,6 @@ async function runTest() {
     try {
         console.log("Setting up test environment...");
         
-        // Backup original config if exists
-        if (fs.existsSync(configPath)) {
-            fs.renameSync(configPath, backupPath);
-        }
-
-        // Write test-specific config
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-
         console.log("Initializing OMNI engine...");
         const { ptr: configPtr, len: configLen } = writeString(JSON.stringify(testConfig));
         init_engine_with_config(configPtr, configLen);
@@ -113,10 +102,6 @@ async function runTest() {
 
     } finally {
         console.log("\nCleaning up...");
-        if (fs.existsSync(backupPath)) {
-            if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
-            fs.renameSync(backupPath, configPath);
-        }
         if (failed) process.exit(1);
     }
 }

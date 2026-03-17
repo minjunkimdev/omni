@@ -16,7 +16,6 @@ bin/*
 *.log
 actual_stdout.txt
 test-*.js
-omni*.json
 core/*.bak
 # --- Environment & Configuration ---
 .env

@@ -71,5 +71,4 @@ verify: check-version build test report
 clean:
 	@echo "Cleaning artifacts..."
 	rm -rf core/zig-out core/.zig-cache dist
-	rm -f omni_config.json.bak
 	@echo "✓ Environment cleaned."

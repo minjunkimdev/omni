@@ -25,15 +25,25 @@ pub fn main() !void {
     try filters.append(allocator, SqlFilter.filter());
     try filters.append(allocator, NodeFilter.filter());
 
-    // Load Custom Rules
-    var custom_filter_to_deinit: ?*CustomFilter = null;
-    defer if (custom_filter_to_deinit) |c| c.deinit();
+    // Load Custom Rules (Hierarchy: ~/.omni/omni_config.json + ./omni_config.json)
+    const custom_filter = try CustomFilter.init(allocator);
+    defer custom_filter.deinit();
 
-    const custom_init = CustomFilter.init(allocator, "omni_config.json");
-    if (custom_init) |custom| {
-        custom_filter_to_deinit = custom;
-        try filters.append(allocator, custom.filter());
+    // 1. Try Global Config (~/.omni/omni_config.json)
+    if (std.process.getEnvVarOwned(allocator, "HOME")) |home| {
+        defer allocator.free(home);
+        const global_path = std.fs.path.join(allocator, &[_][]const u8{ home, ".omni", "omni_config.json" }) catch null;
+        if (global_path) |gp| {
+            defer allocator.free(gp);
+            custom_filter.loadFromFile(gp) catch {};
+        }
     } else |_| {}
+
+    // 2. Try Local Config (./omni_config.json)
+    custom_filter.loadFromFile("omni_config.json") catch {};
+
+    // Add to registry (even if empty, it's safer)
+    try filters.append(allocator, custom_filter.filter());
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -103,7 +113,7 @@ fn printHelp() !void {
         \\  density          Analyze context density gain
         \\  report           Show unified system & performance report
         \\  bench [N]        Benchmark performance (default 100 iterations)
-        \\  generate [agent] Generate template input_file for AI agents
+        \\  generate [type]    Generate configurations (agent, config)
         \\  setup            Show detailed setup and usage instructions
         \\  update           Check for the latest version from GitHub
         \\  uninstall        Remove OMNI and clean up all configurations
@@ -112,6 +122,7 @@ fn printHelp() !void {
         \\Examples:
         \\  cat log.txt | omni
         \\  omni density < draft.txt
+        \\  omni generate config     > omni_config.json
         \\  omni generate claude-code > .omni-input
         \\
         \\OMNI is designed to be used as a filter in your agentic pipelines.
@@ -484,6 +495,8 @@ fn handleGenerate(agent: []const u8) !void {
         , .{});
     } else if (std.mem.eql(u8, agent, "antigravity")) {
         try autoConfigureAntigravity(alloc, home, absolute_omni_path);
+    } else if (std.mem.eql(u8, agent, "config")) {
+        try handleGenerateConfig();
     } else {
         try stdout.print(
             \\# ─── OMNI MCP Setup ───
@@ -492,12 +505,49 @@ fn handleGenerate(agent: []const u8) !void {
             \\#
             \\#   omni generate claude-code     → Claude Code / Claude CLI (Absolute Path)
             \\#   omni generate antigravity      → Google Antigravity (Auto-Merge)
+            \\#   omni generate config           → Starter omni_config.json template
             \\#
             \\# Or run the full interactive setup guide:
             \\#   omni setup
             \\
         , .{});
     }
+}
+
+fn handleGenerateConfig() !void {
+    const stdout = std.fs.File.stdout().deprecatedWriter();
+    try stdout.print(
+        \\{{
+        \\  "//": "OMNI Configuration Template",
+        \\  "//": "Place this in ~/.omni/omni_config.json (Global) or ./omni_config.json (Local)",
+        \\  
+        \\  "rules": [
+        \\    {{
+        \\      "name": "mask-passwords",
+        \\      "match": "password:",
+        \\      "action": "mask"
+        \\    }},
+        \\    {{
+        \\      "name": "remove-noise",
+        \\      "match": "Checking for updates...",
+        \\      "action": "remove"
+        \\    }}
+        \\  ],
+        \\  
+        \\  "dsl_filters": [
+        \\    {{
+        \\      "name": "git-status",
+        \\      "trigger": "On branch",
+        \\      "rules": [
+        \\        {{ "capture": "On branch {{branch}}", "action": "keep" }},
+        \\        {{ "capture": "modified: {{file}}", "action": "count", "as": "mod" }}
+        \\      ],
+        \\      "output": "git({{branch}}) | {{mod}} files modified"
+        \\    }}
+        \\  ]
+        \\}}
+        \\
+    , .{});
 }
 
 fn autoConfigureAntigravity(alloc: std.mem.Allocator, home: []const u8, absolute_omni_path: []const u8) !void {
@@ -634,6 +684,29 @@ fn handleSetup() !void {
                             // Remove stale symlink if exists
                             std.posix.unlink(dst_dist.?) catch {};
                             std.posix.symlink(real_src_dist.?, dst_dist.?) catch {};
+                        }
+                    }
+                }
+
+                // Initialize Global Config if it doesn't exist
+                const global_config_path = std.fmt.allocPrint(alloc, "{s}/omni_config.json", .{omni_dir.?}) catch null;
+                if (global_config_path) |path| {
+                    const config_file_check = std.fs.cwd().openFile(path, .{});
+                    if (config_file_check) |file| {
+                        file.close();
+                    } else |_| {
+                        // Create default config
+                        const default_config = 
+                            \\{
+                            \\  "rules": [],
+                            \\  "dsl_filters": []
+                            \\}
+                            \\
+                        ;
+                        const f = std.fs.cwd().createFile(path, .{}) catch null;
+                        if (f) |file| {
+                            _ = file.write(default_config) catch {};
+                            file.close();
                         }
                     }
                 }
