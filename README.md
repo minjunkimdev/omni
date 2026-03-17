@@ -66,7 +66,7 @@ graph TD
         direction TB
         B["LRU Cache<br/>&lt; 1ms hit"]
         C["Filter Engine (Zig + Wasm)<br/>Semantic Distillation"]
-        D["Pure Signal + Clean Context<br/>(30–90% token reduction)"]
+        D["Pure Signal<br/>Refined Context<br/>(30–90% token reduction)"]
         E["Metrics & Density<br/>(Performance Report)"]
         
         B --> C
@@ -75,7 +75,7 @@ graph TD
     end
 
     A -->|"stdin pipe"| OMNI
-    E -->|"Pure Signal + Clean Context"| F["AI Agent Platform (Claude/Antigravity/Etc)<br/>Zero Noise reasoning"]
+    E -->|"Pure Signal<br/>Refined Context"| F["AI Agent Platform (Claude/Antigravity/Etc)<br/>Zero Noise reasoning"]
 
 
     %% Theme-agnostic Professional Styling
