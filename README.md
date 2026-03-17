@@ -13,7 +13,7 @@
 
 <p align="center">
   <strong>The world's first Semantic Density engine for Agentic AI</strong><br>
-  Eliminating <strong>80–99% of token noise</strong> with <strong>Zero Semantic Loss</strong>.<br>
+  Eliminating <strong>30–90% of token noise</strong> with <strong>Zero Semantic Loss</strong>.<br>
   Transforming chaotic tool output into pure, high-density signal · Powered by Zig + Wasm.
 </p>
 
