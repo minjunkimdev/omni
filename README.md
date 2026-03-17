@@ -327,7 +327,7 @@ brew install fajarhide/tap/omni
 
 ### One-Line Installer (Optimized)
 ```bash
-curl -fsSL https://omni-nine-rho.vercel.app/install | sh
+curl -fsSL https://omni.weekndlabs.com/install | sh
 ```
 
 For manual build instructions, see **[INSTALL.md](INSTALL.md)**.
