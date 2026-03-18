@@ -44,7 +44,7 @@ OMNI provides a powerful, multi-purpose CLI that consolidates all diagnostic and
 | :--- | :--- |
 | **`distill`** | The core semantic engine (default behavior via stdin). |
 | **`density`** | Analyzes context gain and "Information per Token" metrics. |
-| **`report`** | Generates a unified system status and performance summary. |
+| **`monitor`** | Unified dashboard for system status, savings trend, and opportunity scanner. |
 | **`bench`** | High-speed benchmark for semantic throughput. |
 | **`generate`** | Outputs templates for Claude Code, Antigravity, and others. |
 | **`setup`** | Interactive guide for integration and standard aliasing. |
@@ -265,12 +265,18 @@ You can manually edit these files to define `rules` (exact matching) or `dsl_fil
 
 OMNI is obsessed with efficiency. Use these tools to see how much you're saving:
 
-### 1. Unified Efficiency Report
-Run this to see a daily/weekly breakdown of tokens saved and latency overhead:
+### 1. Unified Dashboard
+Run the monitor to see a breakdown of tokens saved, filtering latency, and efficiency per agent:
 ```bash
-omni report
+omni monitor
 ```
-*Shows: Total commands processed, bytes saved, and average filtering latency (< 1ms).*
+*Shows: Total commands processed, efficiency rating, and detailed filter/agent breakdown.*
+
+**Advanced Views:**
+- `omni monitor --trend` : Displays an ASCII chart of your daily distillation savings.
+- `omni monitor --log` : Shows recent tool calls and filtering results in a timeline.
+- `omni monitor --by week` : Aggregated metrics structured by week (or `day`, `month`).
+- `omni monitor scan` : Analyzes your shell history for tools that could benefit from OMNI.
 
 ### 2. Context Density Analysis
 Measure the "Information per Token" gain for any text file or output:
@@ -314,7 +320,7 @@ While other tools focus on simple filtering, OMNI provides a full semantic layer
 
 1.  **The "Distillation" Effect**: In your AI's tool output, raw logs are transformed into a 10-line summary.
 2.  **Faster Response Times**: LLM processes 150x fewer tokens, giving you significantly faster replies.
-3.  **Real-time Reports**: Run `omni report` at any time to see the global efficiency health.
+3.  **Real-time Reports**: Run `omni monitor` at any time to see the global efficiency health.
 4.  **Density Metrics**: Use `omni density < logs.txt` to calculate your exact Context Density Gain.
 
 ---
