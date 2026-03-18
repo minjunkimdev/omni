@@ -13,7 +13,7 @@
 
 <p align="center">
   <strong>The world's first Semantic Density engine for Agentic AI</strong><br>
-  Eliminating <strong>80–99% of token noise</strong> with <strong>Zero Semantic Loss</strong>.<br>
+  Eliminating <strong>30–90% of token noise</strong> with <strong>Zero Semantic Loss</strong>.<br>
   Transforming chaotic tool output into pure, high-density signal · Powered by Zig + Wasm.
 </p>
 
@@ -220,7 +220,7 @@ See the **[DSL_GUIDE.md](docs/DSL_GUIDE.md)** for full documentation and example
 
 ---
 
-## ⚙️ Configuration Architecture
+## Configuration Architecture
 
 OMNI uses a **dual-layer, additive configuration system** to provide both global consistency and project-specific flexibility.
 
@@ -327,7 +327,7 @@ brew install fajarhide/tap/omni
 
 ### One-Line Installer (Optimized)
 ```bash
-curl -fsSL https://omni-nine-rho.vercel.app/install | sh
+curl -fsSL https://omni.weekndlabs.com/install | sh
 ```
 
 For manual build instructions, see **[INSTALL.md](INSTALL.md)**.
