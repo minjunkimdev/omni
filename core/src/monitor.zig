@@ -86,66 +86,33 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
     // DEFAULT SUMMARY
     // ═══════════════════════════════════════
     if (!opts.daily and !opts.weekly and !opts.monthly and !opts.all and !opts.graph and !opts.history and !opts.format_json) {
-        try stdout.print("\n", .{});
-        try ui.hline(stdout, .top);
-        try ui.row(stdout, ui.BOLD ++ ui.WHITE ++ "OMNI Distillation Monitor" ++ ui.RESET);
-        try ui.hline(stdout, .mid);
+        try ui.printHeader(stdout, "OMNI DISTILLATION MONITOR");
 
         const in_str = try metrics.formatBytes(allocator, global_in);
         const out_str = try metrics.formatBytes(allocator, global_out);
         const s_str = try metrics.formatBytes(allocator, global_saved);
-        const total_ms_str = try metrics.formatMs(allocator, global_ms, 1);
         const avg_ms_str = try metrics.formatMs(allocator, global_ms, global_cmds);
         defer {
-            allocator.free(in_str); allocator.free(out_str); allocator.free(s_str);
-            allocator.free(total_ms_str); allocator.free(avg_ms_str);
+            allocator.free(in_str); allocator.free(out_str); allocator.free(s_str); allocator.free(avg_ms_str);
         }
 
         const avg_pct = if (global_in > 0) (@as(f64, @floatFromInt(global_saved)) / @as(f64, @floatFromInt(global_in))) * 100.0 else 0.0;
-        const s_buf = try std.fmt.allocPrint(allocator, "{s} ({d:.1}%)", .{ s_str, avg_pct }); defer allocator.free(s_buf);
-        const t_buf = try std.fmt.allocPrint(allocator, "{s} (avg {s})", .{ total_ms_str, avg_ms_str }); defer allocator.free(t_buf);
-
-        {
-            const l = try std.fmt.allocPrint(allocator, ui.GRAY ++ "Distillations   " ++ ui.WHITE ++ "{d}" ++ ui.RESET, .{global_cmds});
-            defer allocator.free(l); try ui.row(stdout, l);
-        }
-        {
-            const l = try std.fmt.allocPrint(allocator, ui.GRAY ++ "Input           " ++ ui.WHITE ++ "{s}" ++ ui.RESET, .{in_str});
-            defer allocator.free(l); try ui.row(stdout, l);
-        }
-        {
-            const l = try std.fmt.allocPrint(allocator, ui.GRAY ++ "Output          " ++ ui.WHITE ++ "{s}" ++ ui.RESET, .{out_str});
-            defer allocator.free(l); try ui.row(stdout, l);
-        }
-        {
-            const l = try std.fmt.allocPrint(allocator, ui.GRAY ++ "Saved           " ++ ui.WHITE ++ "{s}" ++ ui.RESET, .{s_buf});
-            defer allocator.free(l); try ui.row(stdout, l);
-        }
-        {
-            const l = try std.fmt.allocPrint(allocator, ui.GRAY ++ "Latency         " ++ ui.WHITE ++ "{s}" ++ ui.RESET, .{t_buf});
-            defer allocator.free(l); try ui.row(stdout, l);
-        }
-
-        try ui.row(stdout, "");
-        const meter_w = 30;
-        const filled = @min(@as(usize, @intFromFloat((avg_pct / 100.0) * 30.0)), 30);
         const color = ui.colorForPct(avg_pct);
-        
-        var mb = std.ArrayListUnmanaged(u8){};
-        defer mb.deinit(allocator);
-        const mbw = mb.writer(allocator);
-        try mbw.print(ui.GRAY ++ "Efficiency  " ++ ui.RESET, .{});
-        for (0..filled) |_| try mbw.print("{s}●" ++ ui.RESET, .{color});
-        for (0..meter_w - filled) |_| try mbw.print(ui.DIM ++ "○" ++ ui.RESET, .{});
-        try mbw.print(" " ++ ui.BOLD ++ "{s}{d:.1}%" ++ ui.RESET, .{ color, avg_pct });
-        try ui.row(stdout, mb.items);
-        try ui.hline(stdout, .bot);
+
+        try stdout.print("\n", .{});
+        try stdout.print("  " ++ ui.WHITE ++ "{d:^12}" ++ ui.RESET ++ " " ++ ui.WHITE ++ "{s:^12}" ++ ui.RESET ++ " " ++ ui.WHITE ++ "{s:^12}" ++ ui.RESET ++ " " ++ ui.WHITE ++ "{s}{d:^12.1}%" ++ ui.RESET ++ " " ++ ui.WHITE ++ "{s:^12}" ++ ui.RESET ++ "\n", .{ global_cmds, in_str, s_str, color, avg_pct, avg_ms_str });
+        try stdout.print("  " ++ ui.DIM ++ "{s:^12} {s:^12} {s:^12} {s:^12} {s:^12}" ++ ui.RESET ++ "\n", .{ "runs", "input", "saved", "rate", "avg" });
+        try stdout.print("\n", .{});
+
+        const m_buf = try ui.progressBar(allocator, "efficiency", avg_pct, 40);
+        defer allocator.free(m_buf);
+        try ui.row(stdout, m_buf);
+        try stdout.print("\n", .{});
+        try ui.divider(stdout);
 
         // Filter Performance
         if (filter_map.count() > 0) {
-            try stdout.print("\n", .{}); try ui.hline(stdout, .top);
-            try ui.row(stdout, ui.BOLD ++ ui.WHITE ++ "Filter Performance" ++ ui.RESET); try ui.hline(stdout, .mid);
-            try ui.row(stdout, ui.BOLD ++ " #   Filter              Runs     Saved     Rate    Speed " ++ ui.RESET); try ui.hline(stdout, .mid);
+            try ui.printHeader(stdout, "FILTER PERFORMANCE");
             
             var rows = std.ArrayListUnmanaged(metrics.GroupedStats){};
             defer rows.deinit(allocator);
@@ -160,25 +127,29 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
                 }
             }
 
+            try stdout.print("\n", .{});
             for (rows.items, 0..) |r, idx| {
                 const s = r.stats;
                 const fs = try metrics.formatBytes(allocator, s.saved);
-                const ft = try metrics.formatMs(allocator, s.ms, s.cmds);
-                defer { allocator.free(fs); allocator.free(ft); }
+                defer allocator.free(fs);
                 const fp = if (s.input > 0) (@as(f64, @floatFromInt(s.saved)) / @as(f64, @floatFromInt(s.input))) * 100.0 else 0.0;
-                const c = ui.colorForPct(fp);
-                const rl = try std.fmt.allocPrint(allocator, "{d:>2}. " ++ ui.CYAN ++ "{s:<18}" ++ ui.RESET ++ "{d:>6}  {s:>8}  {s}{d:>6.1}%" ++ ui.RESET ++ "  {s:>7}", .{
-                    idx + 1, r.label, s.cmds, fs, c, fp, ft,
+                
+                const bar_str = try ui.progressBar(allocator, "", fp, 20);
+                defer allocator.free(bar_str);
+                
+                const rl = try std.fmt.allocPrint(allocator, "{d:>2}. " ++ ui.CYAN ++ "{s:<16}" ++ ui.RESET ++ "{d:>5}x  " ++ ui.WHITE ++ "{s:>8} saved" ++ ui.RESET ++ "  {s}", .{
+                    idx + 1, r.label, s.cmds, fs, bar_str,
                 });
                 defer allocator.free(rl); try ui.row(stdout, rl);
             }
-            try ui.hline(stdout, .bot);
+            try stdout.print("\n", .{});
+            try ui.divider(stdout);
         }
 
         // Agent Breakdown
         if (agent_map.count() > 0) {
-            try stdout.print("\n", .{}); try ui.hline(stdout, .top);
-            try ui.row(stdout, ui.BOLD ++ ui.WHITE ++ "Agent Breakdown" ++ ui.RESET); try ui.hline(stdout, .mid);
+            try ui.printHeader(stdout, "AGENT BREAKDOWN");
+            try stdout.print("\n", .{});
             var it = agent_map.iterator();
             while (it.next()) |entry| {
                 const an = entry.key_ptr.*; const as = entry.value_ptr.*;
@@ -186,12 +157,13 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
                 const ain = try metrics.formatBytes(allocator, as.input);
                 defer { allocator.free(asv); allocator.free(ain); }
                 const ap = if (as.input > 0) (@as(f64, @floatFromInt(as.saved)) / @as(f64, @floatFromInt(as.input))) * 100.0 else 0.0;
+                const c = ui.colorForPct(ap);
 
-                const row_msg = try std.fmt.allocPrint(allocator, ui.MAGENTA ++ ui.BOLD ++ "▸ {s}" ++ ui.RESET, .{an});
+                const row_msg = try std.fmt.allocPrint(allocator, ui.HEX_FULL ++ " " ++ ui.MAGENTA ++ ui.BOLD ++ "{s}" ++ ui.RESET, .{an});
                 defer allocator.free(row_msg);
                 try ui.row(stdout, row_msg);
                 {
-                    const l = try std.fmt.allocPrint(allocator, "  Runs: {d}  Input: {s}  Saved: {s} ({d:.1}%)", .{ as.cmds, ain, asv, ap });
+                    const l = try std.fmt.allocPrint(allocator, "  Runs: {d}  Input: {s}  Saved: {s} ({s}{d:.1}%" ++ ui.RESET ++ ")", .{ as.cmds, ain, asv, c, ap });
                     defer allocator.free(l); try ui.row(stdout, l);
                 }
                 var flb = std.ArrayListUnmanaged(u8){};
@@ -217,9 +189,8 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
                 }
                 try ui.row(stdout, flb.items); try ui.row(stdout, "");
             }
-            try ui.hline(stdout, .bot);
+            try ui.divider(stdout);
         }
-        try stdout.print("\n", .{});
     }
 
     if (opts.format_json) {
@@ -244,17 +215,16 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
 
     const TableRenderer = struct {
         fn render(alloc: std.mem.Allocator, map: *std.StringHashMap(metrics.Stats), title: []const u8, out: anytype, rowTitle: []const u8, g_cmds: usize, g_in: usize, g_out: usize, g_s: usize, g_ms: u64) !void {
-            const ft = try std.fmt.allocPrint(alloc, "{s} ({d} entries)", .{ title, map.count() }); defer alloc.free(ft);
-            try out.print("\n", .{});
-            try ui.hline(out, .top);
-            const r1 = try std.fmt.allocPrint(alloc, ui.BOLD ++ ui.WHITE ++ " {s}" ++ ui.RESET, .{ft});
-            defer alloc.free(r1);
-            try ui.row(out, r1); 
-            try ui.hline(out, .mid);
-            const r2 = try std.fmt.allocPrint(alloc, ui.BOLD ++ " {s:<14} │ {s:>5} │ {s:>8} │ {s:>8} │ {s:>8} │ {s:>6} │ {s:>7} " ++ ui.RESET, .{ rowTitle, "Cmds", "Input", "Output", "Saved", "Rate", "Time" });
+            var title_upper = std.ArrayListUnmanaged(u8){};
+            defer title_upper.deinit(alloc);
+            for (title) |c| try title_upper.append(alloc, std.ascii.toUpper(c));
+            
+            try ui.printHeader(out, title_upper.items);
+            
+            const r2 = try std.fmt.allocPrint(alloc, ui.DIM ++ "  {s:<15} {s:>5}  {s:>8}  {s:>8}  {s:>8}  {s:>6}  {s:>7} " ++ ui.RESET, .{ rowTitle, "Cmds", "Input", "Output", "Saved", "Rate", "Time" });
             defer alloc.free(r2);
             try ui.row(out, r2);
-            try ui.hline(out, .mid);
+            try ui.dividerSolid(out);
             
             var rows = std.ArrayListUnmanaged(metrics.GroupedStats){};
             defer rows.deinit(alloc);
@@ -269,14 +239,14 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
             for (rows.items) |r| {
                 const s = r.stats; const in_s = try metrics.formatBytes(alloc, s.input); const out_s = try metrics.formatBytes(alloc, s.output); const sv_s = try metrics.formatBytes(alloc, s.saved); const ms_s = try metrics.formatMs(alloc, s.ms, s.cmds); defer { alloc.free(in_s); alloc.free(out_s); alloc.free(sv_s); alloc.free(ms_s); }
                 const sp = if (s.input > 0) (@as(f64, @floatFromInt(s.saved)) / @as(f64, @floatFromInt(s.input))) * 100.0 else 0.0; const c = ui.colorForPct(sp);
-                const rl = try std.fmt.allocPrint(alloc, " " ++ ui.CYAN ++ "{s:<14}" ++ ui.RESET ++ " │ {d:>5} │ {s:>8} │ {s:>8} │ {s:>8} │ {s}{d:>5.1}%" ++ ui.RESET ++ " │ {s:>7} ", .{ r.label, s.cmds, in_s, out_s, sv_s, c, sp, ms_s });
+                const rl = try std.fmt.allocPrint(alloc, "  " ++ ui.CYAN ++ "{s:<15}" ++ ui.RESET ++ " {d:>5}  {s:>8}  {s:>8}  {s:>8}  {s}{d:>5.1}%" ++ ui.RESET ++ "  {s:>7} ", .{ r.label, s.cmds, in_s, out_s, sv_s, c, sp, ms_s });
                 defer alloc.free(rl); try ui.row(out, rl);
             }
-            try ui.hline(out, .mid);
+            try ui.dividerSolid(out);
             const gin = try metrics.formatBytes(alloc, g_in); const gout = try metrics.formatBytes(alloc, g_out); const gs = try metrics.formatBytes(alloc, g_s); const gms = try metrics.formatMs(alloc, g_ms, g_cmds); defer { alloc.free(gin); alloc.free(gout); alloc.free(gs); alloc.free(gms); }
             const gp = if (g_in > 0) (@as(f64, @floatFromInt(g_s)) / @as(f64, @floatFromInt(g_in))) * 100.0 else 0.0;
-            const tr = try std.fmt.allocPrint(alloc, ui.BOLD ++ " {s:<14} │ {d:>5} │ {s:>8} │ {s:>8} │ {s:>8} │ {d:>5.1}% │ {s:>7} " ++ ui.RESET, .{ "TOTAL", g_cmds, gin, gout, gs, gp, gms });
-            defer alloc.free(tr); try ui.row(out, tr); try ui.hline(out, .bot);
+            const tr = try std.fmt.allocPrint(alloc, ui.BOLD ++ "  {s:<15} {d:>5}  {s:>8}  {s:>8}  {s:>8}  {d:>5.1}%  {s:>7} " ++ ui.RESET, .{ "Total", g_cmds, gin, gout, gs, gp, gms });
+            defer alloc.free(tr); try ui.row(out, tr); try out.print("\n", .{});
         }
     };
 
@@ -332,26 +302,30 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
             }
         }
         var maxv: usize = 0; for (darr.items) |d| { const v = dss.get(d) orelse 0; if (v > maxv) maxv = v; }
-        try stdout.print("\n", .{}); try ui.hline(stdout, .top);
-        try ui.row(stdout, ui.BOLD ++ ui.WHITE ++ "Distillation Trend" ++ ui.RESET); try ui.hline(stdout, .mid);
+        try ui.printHeader(stdout, "DISTILLATION TREND");
         for (darr.items) |d| {
             const v = dss.get(d) orelse 0;
             const bl = if (maxv > 0) @as(usize, @intFromFloat((@as(f64, @floatFromInt(v)) / @as(f64, @floatFromInt(maxv))) * 40.0)) else 0;
             const dl = if (d.len >= 10) d[5..10] else d;
             const sv = try metrics.formatBytes(allocator, v); defer allocator.free(sv);
             var gbuf = std.ArrayListUnmanaged(u8){}; defer gbuf.deinit(allocator); const gbw = gbuf.writer(allocator);
-            try gbw.print(ui.GRAY ++ "{s} " ++ ui.RESET, .{dl});
-            for (0..bl) |_| try gbw.print(ui.GREEN ++ "▓" ++ ui.RESET, .{});
-            for (0..40 - bl) |_| try gbw.print(ui.DIM ++ "░" ++ ui.RESET, .{});
-            try gbw.print(" " ++ ui.WHITE ++ "{s}" ++ ui.RESET, .{sv});
+            try gbw.print(ui.GRAY ++ "  {s}  " ++ ui.RESET, .{dl});
+            if (bl == 0) {
+                try gbw.print(ui.DIM ++ "⡀" ++ ui.RESET, .{});
+                for (1..40) |_| try gbw.print(" ", .{});
+            } else {
+                for (0..bl) |_| try gbw.print(ui.GREEN ++ "⣿" ++ ui.RESET, .{});
+                for (0..40 - bl) |_| try gbw.print(" ", .{});
+            }
+            try gbw.print("  " ++ ui.WHITE ++ "{s}" ++ ui.RESET, .{sv});
             try ui.row(stdout, gbuf.items);
         }
-        try ui.hline(stdout, .bot);
+        try stdout.print("\n", .{});
+        try ui.divider(stdout);
     }
 
     if (opts.history) {
-        try stdout.print("\n", .{}); try ui.hline(stdout, .top);
-        try ui.row(stdout, ui.BOLD ++ ui.WHITE ++ "Recent Distillations" ++ ui.RESET); try ui.hline(stdout, .mid);
+        try ui.printHeader(stdout, "RECENT DISTILLATIONS");
         const count = if (all_records.items.len > 10) 10 else all_records.items.len;
         for (all_records.items.len - count..all_records.items.len) |idx| {
             const rec = all_records.items[idx];
@@ -361,21 +335,21 @@ pub fn handleMonitor(allocator: std.mem.Allocator, opts: MonitorOptions) !void {
             const saved = if (rec.input_bytes > rec.output_bytes) rec.input_bytes - rec.output_bytes else 0;
             const sv = try metrics.formatBytes(allocator, saved); defer allocator.free(sv);
             const pct = if (rec.input_bytes > 0) (@as(f64, @floatFromInt(saved)) / @as(f64, @floatFromInt(rec.input_bytes))) * 100.0 else 0.0;
-            const c = ui.colorForPct(pct); const dot = if (pct >= 50.0) "◆" else if (pct >= 20.0) "◇" else "·";
-            const hl = try std.fmt.allocPrint(allocator, ui.GRAY ++ "{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}" ++ ui.RESET ++ " {s}{s}" ++ ui.RESET ++ " " ++ ui.CYAN ++ "{s:<15}" ++ ui.RESET ++ " " ++ ui.GRAY ++ "[{s:<12}]" ++ ui.RESET ++ " {s}{d:>4.1}%" ++ ui.RESET ++ " " ++ ui.DIM ++ "({s:>8})" ++ ui.RESET, .{
+            const c = ui.colorForPct(pct); const dot = if (pct >= 50.0) ui.HEX_FULL else if (pct >= 20.0) ui.HEX_EMPTY else "·";
+            const hl = try std.fmt.allocPrint(allocator, ui.GRAY ++ "  {d:0>2}-{d:0>2} {d:0>2}:{d:0>2}" ++ ui.RESET ++ "  {s}{s}" ++ ui.RESET ++ "  " ++ ui.CYAN ++ "{s:<15}" ++ ui.RESET ++ "  " ++ ui.GRAY ++ "{s:<12}" ++ ui.RESET ++ "  {s}{d:>4.1}%" ++ ui.RESET ++ " " ++ ui.DIM ++ "({s:>8})" ++ ui.RESET, .{
                 md.month.numeric(), md.day_index + 1, dsecs.getHoursIntoDay(), dsecs.getMinutesIntoHour(),
                 c, dot, rec.filter_name, rec.agent, c, pct, sv,
             });
             defer allocator.free(hl); try ui.row(stdout, hl);
         }
-        try ui.hline(stdout, .bot);
+        try stdout.print("\n", .{});
+        try ui.divider(stdout);
     }
 }
 
 pub fn handleDiscover(allocator: std.mem.Allocator) !void {
     const stdout = std.fs.File.stdout().deprecatedWriter();
-    try stdout.print("\n", .{}); try ui.hline(stdout, .top);
-    try ui.row(stdout, ui.BOLD ++ ui.WHITE ++ "Savings Opportunity Scanner" ++ ui.RESET); try ui.hline(stdout, .mid);
+    try ui.printHeader(stdout, "SAVINGS OPPORTUNITY SCANNER");
     const home = std.posix.getenv("HOME") orelse return; var found: usize = 0;
     const history_files = [_][]const u8{ ".zsh_history", ".bash_history" };
     for (history_files) |hf| {
@@ -394,15 +368,17 @@ pub fn handleDiscover(allocator: std.mem.Allocator) !void {
             const maxs = if (missed.items.len > 10) 10 else missed.items.len;
             for (missed.items.len - maxs..missed.items.len) |idx| {
                 const cmd = missed.items[idx]; const tr = if (cmd.len > 68) cmd[0..65] else cmd; const dots_c = if (cmd.len > 68) "..." else "";
-                const row_msg = try std.fmt.allocPrint(allocator, ui.RED ++ "○" ++ ui.RESET ++ " " ++ ui.WHITE ++ "{s}{s}" ++ ui.RESET, .{ tr, dots_c });
+                const row_msg = try std.fmt.allocPrint(allocator, ui.DIM ++ "  " ++ ui.HEX_EMPTY ++ ui.RESET ++ " " ++ ui.WHITE ++ "{s}{s}" ++ ui.RESET, .{ tr, dots_c });
                 defer allocator.free(row_msg); try ui.row(stdout, row_msg);
-                try ui.row(stdout, "  " ++ ui.DIM ++ "→ Pipe with `| omni` for ~60% reduction" ++ ui.RESET); found += 1;
+                try ui.row(stdout, "    " ++ ui.DIM ++ "→ Pipe with `| omni` for ~60% reduction" ++ ui.RESET); 
+                try stdout.print("\n", .{});
+                found += 1;
             }
         } else |_| {}
     }
-    if (found == 0) { try ui.row(stdout, ui.GREEN ++ "● All clear!" ++ ui.RESET ++ " No missed opportunities found."); } else {
-        try ui.hline(stdout, .mid); const fmsg = try std.fmt.allocPrint(allocator, ui.YELLOW ++ "  {d} commands could benefit from OMNI distillation" ++ ui.RESET, .{found});
+    try ui.divider(stdout);
+    if (found == 0) { try ui.row(stdout, "  " ++ ui.GREEN ++ ui.HEX_FULL ++ " All clear!" ++ ui.RESET ++ " No missed opportunities found.\n"); } else {
+        const fmsg = try std.fmt.allocPrint(allocator, ui.YELLOW ++ "  {d} commands could benefit from OMNI distillation\n" ++ ui.RESET, .{found});
         defer allocator.free(fmsg); try ui.row(stdout, fmsg);
     }
-    try ui.hline(stdout, .bot); try stdout.print("\n", .{});
 }

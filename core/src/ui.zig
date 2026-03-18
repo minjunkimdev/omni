@@ -1,7 +1,7 @@
 const std = @import("std");
 
-// ── OMNI Design System ──
-// Perfectly aligned boxes using visible length calculations.
+// ── OMNI Design System V2 ──
+// Clean, borderless dashboard aesthetic.
 
 pub const RESET = "\x1b[0m";
 pub const BOLD = "\x1b[1m";
@@ -15,20 +15,25 @@ pub const WHITE = "\x1b[38;5;255m";
 pub const GRAY = "\x1b[38;5;245m";
 pub const MAGENTA = "\x1b[38;5;213m";
 
-pub const BOX_W = 76; // Inner content width (visible characters)
+// Brand Icons
+pub const HEX_FULL = "⬢";
+pub const HEX_EMPTY = "⬡";
+pub const ARROW = "▸";
 
-pub fn hline(out: anytype, comptime kind: enum { top, mid, bot }) !void {
-    switch (kind) {
-        .top => try out.print(PURPLE ++ "╭", .{}),
-        .mid => try out.print(PURPLE ++ "├", .{}),
-        .bot => try out.print(PURPLE ++ "╰", .{}),
-    }
-    for (0..BOX_W + 2) |_| try out.print("─", .{});
-    switch (kind) {
-        .top => try out.print("╮" ++ RESET ++ "\n", .{}),
-        .mid => try out.print("┤" ++ RESET ++ "\n", .{}),
-        .bot => try out.print("╯" ++ RESET ++ "\n", .{}),
-    }
+// Layout Width
+pub const DASH_W = 76; 
+
+// Divider dots
+pub fn divider(out: anytype) !void {
+    try out.print("  " ++ DIM, .{});
+    for (0..DASH_W / 2) |_| try out.print("· ", .{});
+    try out.print(RESET ++ "\n", .{});
+}
+
+pub fn dividerSolid(out: anytype) !void {
+    try out.print("  " ++ DIM, .{});
+    for (0..DASH_W) |_| try out.print("─", .{});
+    try out.print(RESET ++ "\n", .{});
 }
 
 // Counts visible characters (ignores ANSI sequences and follows UTF-8)
@@ -37,11 +42,9 @@ pub fn visibleLen(str: []const u8) usize {
     var i: usize = 0;
     while (i < str.len) {
         if (str[i] == '\x1b') {
-            // Skip ANSI escape sequence
             while (i < str.len and str[i] != 'm') i += 1;
             if (i < str.len) i += 1;
         } else {
-            // Count UTF-8 character (simplified: assume 1 col for common box/emoji used here)
             const c = str[i];
             if ((c & 0x80) == 0) {
                 i += 1;
@@ -60,13 +63,9 @@ pub fn visibleLen(str: []const u8) usize {
     return count;
 }
 
+// Simple left-padded row (no borders)
 pub fn row(out: anytype, content: []const u8) !void {
-    try out.print(PURPLE ++ "│" ++ RESET ++ " {s}", .{content});
-    const vlen = visibleLen(content);
-    if (vlen < BOX_W) {
-        for (0..BOX_W - vlen) |_| try out.print(" ", .{});
-    }
-    try out.print(" " ++ PURPLE ++ "│" ++ RESET ++ "\n", .{});
+    try out.print("  {s}\n", .{content});
 }
 
 pub fn colorForPct(pct: f64) []const u8 {
@@ -76,20 +75,23 @@ pub fn colorForPct(pct: f64) []const u8 {
 }
 
 pub fn printHeader(out: anytype, title: []const u8) !void {
-    try hline(out, .top);
-    try out.print(PURPLE ++ "│" ++ RESET ++ " " ++ BOLD ++ WHITE ++ "{s}" ++ RESET, .{title});
-    const vlen = visibleLen(title);
-    if (vlen < BOX_W) {
-        for (0..BOX_W - vlen) |_| try out.print(" ", .{});
-    }
-    try out.print(" " ++ PURPLE ++ "│" ++ RESET ++ "\n", .{});
-    try hline(out, .mid);
+    try out.print("\n  " ++ PURPLE ++ BOLD ++ "{s} " ++ WHITE ++ "{s}" ++ RESET ++ "\n", .{ ARROW, title });
+    try divider(out);
 }
 
+// For compatibility with old code, we provide dummy implementations
 pub fn printFooter(out: anytype) !void {
-    try hline(out, .bot);
+    try out.print("\n", .{});
 }
 
+pub fn hline(out: anytype, comptime kind: enum { top, mid, bot }) !void {
+    _ = out;
+    _ = kind;
+    // No-op for old bordered style, or we can map it
+    // But better to just remove hline calls in caller.
+}
+
+// Braille progress bar
 pub fn progressBar(allocator: std.mem.Allocator, label: []const u8, pct: f64, width: usize) ![]u8 {
     const filled = @min(@as(usize, @intFromFloat((pct / 100.0) * @as(f64, @floatFromInt(width)))), width);
     const color = colorForPct(pct);
@@ -98,8 +100,8 @@ pub fn progressBar(allocator: std.mem.Allocator, label: []const u8, pct: f64, wi
     defer mb.deinit(allocator);
     const mbw = mb.writer(allocator);
     try mbw.print(GRAY ++ "{s:<12}" ++ RESET, .{label});
-    for (0..filled) |_| try mbw.print("{s}●" ++ RESET, .{color});
-    for (0..width - filled) |_| try mbw.print(DIM ++ "○" ++ RESET, .{});
-    try mbw.print(" " ++ BOLD ++ "{s}{d:.1}%" ++ RESET, .{ color, pct });
+    for (0..filled) |_| try mbw.print("{s}⣿" ++ RESET, .{color});
+    for (0..width - filled) |_| try mbw.print(DIM ++ "⣀" ++ RESET, .{});
+    try mbw.print("  " ++ BOLD ++ "{s}{d:.1}%" ++ RESET, .{ color, pct });
     return mb.toOwnedSlice(allocator);
 }

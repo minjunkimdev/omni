@@ -70,7 +70,7 @@ pub fn main() !void {
                 try printMonitorHelp();
                 return;
             }
-            if (args.len > 2 and (std.mem.eql(u8, args[2], "discover") or std.mem.eql(u8, args[2], "discovery"))) {
+            if (args.len > 2 and (std.mem.eql(u8, args[2], "scan") or std.mem.eql(u8, args[2], "discover") or std.mem.eql(u8, args[2], "discovery"))) {
                 try monitor.handleDiscover(allocator);
                 return;
             }
@@ -78,16 +78,18 @@ pub fn main() !void {
             for (args[2..]) |arg| {
                 if (std.mem.startsWith(u8, arg, "--agent=")) {
                     opts.filter_agent = arg[8..];
-                } else if (std.mem.eql(u8, arg, "--graph")) {
+                } else if (std.mem.eql(u8, arg, "--trend") or std.mem.eql(u8, arg, "--graph")) {
                     opts.graph = true;
-                } else if (std.mem.eql(u8, arg, "--history")) {
+                } else if (std.mem.eql(u8, arg, "--log") or std.mem.eql(u8, arg, "--history")) {
                     opts.history = true;
-                } else if (std.mem.eql(u8, arg, "--daily")) {
+                } else if (std.mem.eql(u8, arg, "day") or std.mem.eql(u8, arg, "--daily")) {
                     opts.daily = true;
-                } else if (std.mem.eql(u8, arg, "--weekly")) {
+                } else if (std.mem.eql(u8, arg, "week") or std.mem.eql(u8, arg, "--weekly")) {
                     opts.weekly = true;
-                } else if (std.mem.eql(u8, arg, "--monthly")) {
+                } else if (std.mem.eql(u8, arg, "month") or std.mem.eql(u8, arg, "--monthly")) {
                     opts.monthly = true;
+                } else if (std.mem.eql(u8, arg, "--by")) {
+                    // next arg will be day/week/month, handled above
                 } else if (std.mem.eql(u8, arg, "--all")) {
                     opts.all = true;
                 } else if (std.mem.eql(u8, arg, "--format=json") or std.mem.eql(u8, arg, "--json")) {
@@ -542,16 +544,16 @@ fn printMonitorHelp() !void {
     try ui.row(stdout, "");
     try ui.row(stdout, ui.BOLD ++ "Options:" ++ ui.RESET);
     try ui.row(stdout, ui.CYAN ++ "  --agent=<name>  " ++ ui.RESET ++ "Filter metrics by agent");
-    try ui.row(stdout, ui.CYAN ++ "  --graph         " ++ ui.RESET ++ "Show ASCII sparkline graphs");
-    try ui.row(stdout, ui.CYAN ++ "  --history       " ++ ui.RESET ++ "Show session history");
-    try ui.row(stdout, ui.CYAN ++ "  --daily         " ++ ui.RESET ++ "Show daily summary");
-    try ui.row(stdout, ui.CYAN ++ "  --weekly        " ++ ui.RESET ++ "Show weekly summary");
-    try ui.row(stdout, ui.CYAN ++ "  --monthly       " ++ ui.RESET ++ "Show monthly summary");
+    try ui.row(stdout, ui.CYAN ++ "  --trend         " ++ ui.RESET ++ "Show savings trend chart");
+    try ui.row(stdout, ui.CYAN ++ "  --log           " ++ ui.RESET ++ "Show recent distillation log");
+    try ui.row(stdout, ui.CYAN ++ "  --by day        " ++ ui.RESET ++ "Breakdown by day");
+    try ui.row(stdout, ui.CYAN ++ "  --by week       " ++ ui.RESET ++ "Breakdown by week");
+    try ui.row(stdout, ui.CYAN ++ "  --by month      " ++ ui.RESET ++ "Breakdown by month");
     try ui.row(stdout, ui.CYAN ++ "  --all           " ++ ui.RESET ++ "Show all time ranges");
     try ui.row(stdout, ui.CYAN ++ "  --json          " ++ ui.RESET ++ "Output in JSON format");
     try ui.row(stdout, "");
     try ui.row(stdout, ui.BOLD ++ "Subcommands:" ++ ui.RESET);
-    try ui.row(stdout, ui.CYAN ++ "  discover        " ++ ui.RESET ++ "Discover active agents");
+    try ui.row(stdout, ui.CYAN ++ "  scan            " ++ ui.RESET ++ "Scan for missed savings opportunities");
     try ui.printFooter(stdout);
 }
 
