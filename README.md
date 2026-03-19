@@ -259,6 +259,48 @@ You can manually edit these files to define `rules` (exact matching) or `dsl_fil
 
 ---
 
+## Security: Hook Integrity Workflow
+
+OMNI provides a **Trust Boundary** by ensuring that any hook scripts executed through the system remain untampered.
+
+### Why use Custom Hooks?
+Hooks are best used when OMNI's built-in filters aren't enough for your specific needs:
+- **AI DevSecOps**: Run a script like `scan-vulnerabilities.sh` that filters 1000 lines of security output into a 5-line summary for the AI.
+- **Infrastructure Polishing**: A script to clean up `terraform plan` or `kubectl` output to show only the "Intent-Critical" changes.
+- **Data Distillation**: Use a Python script to parse large JSON/XML responses from internal APIs and return only the relevant fields.
+
+### Workflow:
+1. **Add Hooks**: Create the directory if it doesn't exist (`mkdir -p ~/.omni/hooks`) and place your custom scripts there.
+2. **Verify & Trust**: Use the `omni_trust` MCP tool to manually inspect and approve the scripts. This generates SHA-256 signatures in `~/.omni/hooks.sha256`.
+3. **Startup Protection**: Every time the OMNI MCP server starts, it re-calculates hashes and compares them to the trusted signatures.
+4. **Automatic Lockdown**: If any file is modified or an untrusted file is added, OMNI will log a security alert and **immediately exit** to prevent execution of tampered logic.
+
+> [!IMPORTANT]
+> **Modifying Hook Scripts?**
+> If you edit the content of your hook scripts, OMNI will block startup due to the fingerprint mismatch. You **must** run the `omni_trust` MCP tool again to re-authorize the updated scripts and generate new SHA-256 signatures.
+
+### Best Practices: Custom Hooks
+To extend OMNI's capabilities safely using your own scripts, follow this workflow:
+
+1.  **Create**: Store your custom script (e.g., `git-summary.sh`) in `~/.omni/hooks/`.
+2.  **Test**: Verify the script works manually in your terminal.
+3.  **Authorize**: Run the `omni_trust` tool to sign the script's current state.
+4.  **Execute**: Your AI Agent can now safely run the script via `omni_execute`:
+    ```json
+    {
+      "command": "~/.omni/hooks/git-summary.sh"
+    }
+    ```
+
+To manually audit your hook integrity, you can run:
+```bash
+node dist/index.js --test-integrity
+```
+
+[SEE SECURITY.md](SECURITY.md) FOR MORE DETAILS
+
+---
+
 ## Performance Monitoring & Metrics
 
 OMNI is obsessed with efficiency. Use these tools to see how much you're saving:

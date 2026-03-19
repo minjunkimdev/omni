@@ -82,6 +82,12 @@ omni generate claude-code
 ### `omni setup`
 An interactive configuration guide that walks you through optimal OMNI usage, setting shell aliases (e.g., alias `npm`="omni -- npm"), and installing MCP plugins.
 
+### `omni_trust` (MCP Tool)
+An MCP instrumented tool to verify and store SHA-256 hashes of hook scripts in `~/.omni/hooks/`. Run this after you manually inspect and approve new or modified hooks.
+
+### `--test-integrity` (Flag)
+A startup flag for the MCP server (`node dist/index.js --test-integrity`) that performs a one-time verification of hook scripts and exits with 0 on success, or 1 on mismatch.
+
 ### `omni update`
 Connects to GitHub releases to fetch binary updates. Replaces your local binary with the requested version.
 

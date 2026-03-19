@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { WASI } from "wasi";
 import { LRUCache } from "./cache.js";
 import os from "os";
+import crypto from "crypto";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -65,6 +66,58 @@ const WASM_PATH = path.join(__dirname, "..", "core", "omni-wasm.wasm");
 const GLOBAL_CONFIG_DIR = path.join(os.homedir(), ".omni");
 const GLOBAL_CONFIG_PATH = path.join(GLOBAL_CONFIG_DIR, "omni_config.json");
 const LOCAL_CONFIG_PATH = path.join(process.cwd(), "omni_config.json");
+
+// Security: Hook Integrity Check
+const HOOKS_DIR = path.join(os.homedir(), ".omni", "hooks");
+const HOOKS_SHA_FILE = path.join(os.homedir(), ".omni", "hooks.sha256");
+
+async function verifyHookIntegrity() {
+  if (!fs.existsSync(HOOKS_SHA_FILE)) return;
+
+  try {
+    const storedHashesRaw = fs.readFileSync(HOOKS_SHA_FILE, "utf-8");
+    const storedHashes: Record<string, string> = JSON.parse(storedHashesRaw);
+    
+    if (!fs.existsSync(HOOKS_DIR)) {
+      if (Object.keys(storedHashes).length > 0) {
+        console.error(`Security Alert: Hooks directory ${HOOKS_DIR} missing but hashes exist.`);
+        process.exit(1);
+      }
+      return;
+    }
+
+    const files = fs.readdirSync(HOOKS_DIR);
+    const currentHashes: Record<string, string> = {};
+
+    for (const file of files) {
+      const filePath = path.join(HOOKS_DIR, file);
+      if (fs.statSync(filePath).isDirectory()) continue;
+      
+      const content = fs.readFileSync(filePath);
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
+      currentHashes[file] = hash;
+    }
+
+    // Check for mismatches or missing files
+    for (const [file, hash] of Object.entries(storedHashes)) {
+      if (currentHashes[file] !== hash) {
+        console.error(`Security Alert: Hook integrity mismatch for file: ${file}`);
+        process.exit(1);
+      }
+    }
+
+    // Check for new untrusted files
+    for (const file of Object.keys(currentHashes)) {
+      if (!storedHashes[file]) {
+        console.error(`Security Alert: New untrusted hook file detected: ${file}`);
+        process.exit(1);
+      }
+    }
+  } catch (e: any) {
+    console.error(`Error verifying hook integrity: ${e.message}`);
+    process.exit(1);
+  }
+}
 
 function getMergedConfig(): any {
   let config: any = { rules: [], dsl_filters: [] };
@@ -398,6 +451,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["AbsolutePath"],
         },
+      },
+      {
+        name: "omni_trust",
+        description: "Verify and store SHA-256 hashes of hook scripts in ~/.omni/hooks. Run this after you manually inspect and approve new or modified hooks.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+        },
       }
     ],
   };
@@ -701,6 +763,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
+      case "omni_trust": {
+        try {
+          if (!fs.existsSync(HOOKS_DIR)) {
+            return { content: [{ type: "text", text: `No hooks directory found at ${HOOKS_DIR}. Nothing to trust.` }] };
+          }
+
+          const files = fs.readdirSync(HOOKS_DIR);
+          const hashes: Record<string, string> = {};
+
+          for (const file of files) {
+            const filePath = path.join(HOOKS_DIR, file);
+            if (fs.statSync(filePath).isDirectory()) continue;
+            
+            const content = fs.readFileSync(filePath);
+            const hash = crypto.createHash('sha256').update(content).digest('hex');
+            hashes[file] = hash;
+          }
+
+          const dir = path.dirname(HOOKS_SHA_FILE);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          
+          fs.writeFileSync(HOOKS_SHA_FILE, JSON.stringify(hashes, null, 2));
+          return { content: [{ type: "text", text: `Successfully trusted ${Object.keys(hashes).length} hooks. Hashes saved to ${HOOKS_SHA_FILE}.` }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Error updating trusted hashes: ${e.message}` }], isError: true };
+        }
+      }
+
       default:
         throw new Error(`Tool not found: ${request.params.name}`);
     }
@@ -713,6 +803,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
+  // Check for --test-integrity flag
+  if (process.argv.includes("--test-integrity")) {
+    await verifyHookIntegrity();
+    console.log("Hook integrity check passed.");
+    process.exit(0);
+  }
+
+  await verifyHookIntegrity();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
