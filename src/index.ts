@@ -417,16 +417,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const args = request.params.arguments as any;
         const opts = args.cwd ? { cwd: args.cwd } : {};
         let resultOutput = "";
+        let exitCode = 0;
         
         try {
           const { stdout, stderr } = await execAsync(args.command, opts);
           resultOutput = String(stdout) + (stderr ? "\nSTDERR:\n" + String(stderr) : "");
         } catch (e: any) {
           resultOutput = String(e.stdout || "") + (e.stderr ? "\nSTDERR:\n" + String(e.stderr) : "") + `\nExit code: ${e.code}`;
+          exitCode = e.code || 1;
         }
         
         const distilled = await distillText(resultOutput);
-        return { content: [{ type: "text", text: distilled }] };
+        return { 
+          content: [{ type: "text", text: distilled }],
+          metadata: { exitCode }
+        };
       }
 
       case "omni_read_file": {
@@ -507,14 +512,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             let resultOutput = String(stdout);
             if (!resultOutput.trim()) resultOutput = "No matches found.";
             
-            // Grep output can be huge, definitely distill
             const distilled = await distillText(resultOutput);
-            return { content: [{ type: "text", text: distilled }] };
+            return { 
+              content: [{ type: "text", text: distilled }],
+              metadata: { exitCode: 0 }
+            };
          } catch (e: any) {
              if (e.code === 1) {
-                 return { content: [{ type: "text", text: "No matches found." }] }; // grep exits with 1 if no matches
+                 return { 
+                   content: [{ type: "text", text: "No matches found." }],
+                   metadata: { exitCode: 1 }
+                 };
              }
-             return { content: [{ type: "text", text: `Grep error: ${e.message}` }], isError: true };
+             return { 
+               content: [{ type: "text", text: `Grep error: ${e.message}` }], 
+               isError: true,
+               metadata: { exitCode: e.code || 1 }
+             };
          }
       }
 
@@ -529,9 +543,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
              const files = String(stdout).split("\n").filter(Boolean);
              const resultOutput = files.join(", ");
              const distilled = await distillText(resultOutput || "No files found.");
-             return { content: [{ type: "text", text: distilled }] };
+             return { 
+               content: [{ type: "text", text: distilled }],
+               metadata: { exitCode: 0 }
+             };
          } catch (e: any) {
-             return { content: [{ type: "text", text: `Find error: ${e.message}` }], isError: true };
+             return { 
+               content: [{ type: "text", text: `Find error: ${e.message}` }], 
+               isError: true,
+               metadata: { exitCode: e.code || 1 }
+             };
          }
       }
 
@@ -612,14 +633,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "Bash": {
         const command = (request.params.arguments as any).command;
         let resultOutput = "";
+        let exitCode = 0;
         try {
           const { stdout, stderr } = await execAsync(command);
           resultOutput = String(stdout) + (stderr ? "\nSTDERR:\n" + String(stderr) : "");
         } catch (e: any) {
           resultOutput = String(e.stdout || "") + (e.stderr ? "\nSTDERR:\n" + String(e.stderr) : "") + `\nExit code: ${e.code}`;
+          exitCode = e.code || 1;
         }
         const distilled = await distillText(resultOutput);
-        return { content: [{ type: "text", text: distilled }] };
+        return { 
+          content: [{ type: "text", text: distilled }],
+          metadata: { exitCode }
+        };
       }
 
       case "ReadFile": {
@@ -639,14 +665,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const command = args.CommandLine;
         const opts = args.Cwd ? { cwd: args.Cwd } : {};
         let resultOutput = "";
+        let exitCode = 0;
         try {
           const { stdout, stderr } = await execAsync(command, opts);
           resultOutput = String(stdout) + (stderr ? "\nSTDERR:\n" + String(stderr) : "");
         } catch (e: any) {
           resultOutput = String(e.stdout || "") + (e.stderr ? "\nSTDERR:\n" + String(e.stderr) : "") + `\nExit code: ${e.code}`;
+          exitCode = e.code || 1;
         }
         const distilled = await distillText(resultOutput);
-        return { content: [{ type: "text", text: distilled }] };
+        return { 
+          content: [{ type: "text", text: distilled }],
+          metadata: { exitCode }
+        };
       }
 
       case "view_file": {
