@@ -16,6 +16,11 @@ fn categorizeUnknown(input: []const u8) []const u8 {
         return "json";
     }
 
+    // Diff check
+    if (std.mem.startsWith(u8, trimmed, "---") or std.mem.startsWith(u8, trimmed, "+++") or std.mem.startsWith(u8, trimmed, "@@ -")) {
+        return "diff";
+    }
+
     // Stack trace check
     if (std.mem.indexOf(u8, input, "at ") != null and std.mem.indexOf(u8, input, ":") != null) {
         return "stacktrace";
@@ -32,8 +37,13 @@ fn categorizeUnknown(input: []const u8) []const u8 {
     }
 
     // Build check
-    if (std.mem.indexOf(u8, input, "gcc") != null or std.mem.indexOf(u8, input, "clang") != null or std.mem.indexOf(u8, input, "npm install") != null) {
+    if (std.mem.indexOf(u8, input, "gcc") != null or std.mem.indexOf(u8, input, "clang") != null or std.mem.indexOf(u8, input, "npm install") != null or std.mem.indexOf(u8, input, "tsc") != null) {
         return "build";
+    }
+    
+    // Log check (e.g. 2024-03-20 or 2026-03-20)
+    if (input.len > 10 and input[4] == '-' and input[7] == '-') {
+        return "log";
     }
 
     return "unknown";
