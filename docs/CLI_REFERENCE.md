@@ -83,7 +83,10 @@ omni generate claude-code
 An interactive configuration guide that walks you through optimal OMNI usage, setting shell aliases (e.g., alias `npm`="omni -- npm"), and installing MCP plugins.
 
 ### `omni_trust` (MCP Tool)
-An MCP instrumented tool to verify and store SHA-256 hashes of hook scripts in `~/.omni/hooks/`. Run this after you manually inspect and approve new or modified hooks.
+An MCP tool to review and trust a project's local `omni_config.json`. OMNI will not load project-local configs until explicitly trusted. The tool displays the config contents and SHA-256 hash, then registers the project in `~/.omni/trusted-projects.json`. Re-run after modifying the local config for changes to take effect.
+
+### `omni_trust_hooks` (MCP Tool)
+An MCP tool to verify and store SHA-256 hashes of hook scripts in `~/.omni/hooks/`. Run this after you manually inspect and approve new or modified hooks.
 
 ### `--test-integrity` (Flag)
 A startup flag for the MCP server (`node dist/index.js --test-integrity`) that performs a one-time verification of hook scripts and exits with 0 on success, or 1 on mismatch.

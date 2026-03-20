@@ -16,6 +16,49 @@ import crypto from "crypto";
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+
+// Sandbox Env Denylist: block dangerous env vars from child processes
+const ENV_DENYLIST = new Set([
+  // Shell injection vectors
+  'BASH_ENV', 'ENV', 'ZDOTDIR', 'BASH_PROFILE', 'BASH_LOGIN',
+  'BASH_LOGOUT', 'PROFILE', 'INPUTRC', 'HISTFILE',
+  // Node.js
+  'NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'NODE_PATH',
+  'NODE_REDIRECT_WARNINGS', 'NODE_REPL_HISTORY',
+  // Python
+  'PYTHONSTARTUP', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONWARNINGS',
+  'PYTHONDONTWRITEBYTECODE', 'PYTHONHASHSEED',
+  // Ruby
+  'RUBYOPT', 'RUBYLIB', 'GEM_PATH', 'GEM_HOME', 'BUNDLE_GEMFILE',
+  // Perl
+  'PERL5OPT', 'PERL5LIB', 'PERLLIB',
+  // Java
+  'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS',
+  'JAVA_HOME', 'CLASSPATH',
+  // Dynamic linker hijacking (Linux)
+  'LD_PRELOAD', 'LD_LIBRARY_PATH', 'LD_AUDIT',
+  'LD_PROFILE', 'LD_SHOW_AUXV', 'LD_DEBUG',
+  // Dynamic linker hijacking (macOS)
+  'DYLD_INSERT_LIBRARIES', 'DYLD_FORCE_FLAT_NAMESPACE',
+  'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH', 'DYLD_FALLBACK_LIBRARY_PATH',
+  // Curl / HTTP
+  'CURL_CA_BUNDLE', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+  'REQUESTS_CA_BUNDLE', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY',
+  'NO_PROXY', 'http_proxy', 'https_proxy',
+  // Git
+  'GIT_EXEC_PATH', 'GIT_TEMPLATE_DIR', 'GIT_CONFIG_GLOBAL',
+  'GIT_ASKPASS', 'GIT_SSH_COMMAND',
+  // Misc
+  'EDITOR', 'VISUAL', 'BROWSER', 'PAGER',
+  'PROMPT_COMMAND', 'PS1', 'PS2', 'PS4',
+  'IFS', 'CDPATH', 'GLOBIGNORE', 'MAIL', 'MAILPATH',
+]);
+
+function sanitizeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const clean = { ...env };
+  for (const key of ENV_DENYLIST) delete clean[key];
+  return clean;
+}
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Parse Agent Argument (--agent=claude-code)
@@ -72,6 +115,58 @@ const LOCAL_CONFIG_PATH = path.join(process.cwd(), "omni_config.json");
 // Security: Hook Integrity Check
 const HOOKS_DIR = path.join(os.homedir(), ".omni", "hooks");
 const HOOKS_SHA_FILE = path.join(os.homedir(), ".omni", "hooks.sha256");
+
+// Security: Project Trust Boundary
+const TRUSTED_PROJECTS_PATH = path.join(os.homedir(), ".omni", "trusted-projects.json");
+
+interface TrustedProject {
+  path: string;
+  configHash: string;
+  trustedAt: string;
+}
+
+function loadTrustedProjects(): TrustedProject[] {
+  try {
+    if (fs.existsSync(TRUSTED_PROJECTS_PATH)) {
+      return JSON.parse(fs.readFileSync(TRUSTED_PROJECTS_PATH, "utf-8"));
+    }
+  } catch (e) {
+    console.error("Error reading trusted-projects.json:", e);
+  }
+  return [];
+}
+
+function saveTrustedProjects(projects: TrustedProject[]): void {
+  const dir = path.dirname(TRUSTED_PROJECTS_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(TRUSTED_PROJECTS_PATH, JSON.stringify(projects, null, 2));
+}
+
+function hashFileContent(filePath: string): string {
+  const content = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+function isProjectTrusted(projectPath: string): { trusted: boolean; reason?: string } {
+  const configPath = path.join(projectPath, "omni_config.json");
+  if (!fs.existsSync(configPath)) return { trusted: false, reason: "no_config" };
+
+  const projects = loadTrustedProjects();
+  const normalizedPath = path.resolve(projectPath);
+  const entry = projects.find(p => path.resolve(p.path) === normalizedPath);
+
+  if (!entry) {
+    return { trusted: false, reason: "not_trusted" };
+  }
+
+  // Verify config hasn't been tampered with since trust was granted
+  const currentHash = hashFileContent(configPath);
+  if (currentHash !== entry.configHash) {
+    return { trusted: false, reason: "config_modified" };
+  }
+
+  return { trusted: true };
+}
 
 async function verifyHookIntegrity() {
   if (!fs.existsSync(HOOKS_SHA_FILE)) return;
@@ -136,16 +231,25 @@ function getMergedConfig(): any {
     }
   }
 
-  // 2. Merge Local Config (Overrides/Augments)
+  // 2. Merge Local Config (requires explicit trust)
   if (fs.existsSync(LOCAL_CONFIG_PATH)) {
-    try {
-      const localRaw = fs.readFileSync(LOCAL_CONFIG_PATH, "utf-8");
-      const localConfig = JSON.parse(localRaw);
-      // For now, just append rules/filters. Specific name-matching overrides can be added later.
-      if (localConfig.rules) config.rules.push(...localConfig.rules);
-      if (localConfig.dsl_filters) config.dsl_filters.push(...localConfig.dsl_filters);
-    } catch (e) {
-      console.error("Error parsing local config:", e);
+    const trustCheck = isProjectTrusted(process.cwd());
+    if (!trustCheck.trusted) {
+      const reasons: Record<string, string> = {
+        not_trusted: "Local config not trusted. Run omni_trust to review and trust.",
+        config_modified: "Local config modified since last trust. Run omni_trust to re-verify.",
+        no_config: "No local config found."
+      };
+      console.error(`⚠ ${reasons[trustCheck.reason || "not_trusted"]} Skipping local config.`);
+    } else {
+      try {
+        const localRaw = fs.readFileSync(LOCAL_CONFIG_PATH, "utf-8");
+        const localConfig = JSON.parse(localRaw);
+        if (localConfig.rules) config.rules.push(...localConfig.rules);
+        if (localConfig.dsl_filters) config.dsl_filters.push(...localConfig.dsl_filters);
+      } catch (e) {
+        console.error("Error parsing local config:", e);
+      }
     }
   }
 
@@ -500,11 +604,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "omni_trust",
+        name: "omni_trust_hooks",
         description: "Verify and store SHA-256 hashes of hook scripts in ~/.omni/hooks. Run this after you manually inspect and approve new or modified hooks.",
         inputSchema: {
           type: "object",
           properties: {},
+          required: [],
+        },
+      },
+      {
+        name: "omni_trust",
+        description: "Review and trust a project's local omni_config.json. OMNI will not load local configs until explicitly trusted. Shows config contents and SHA-256 hash before trusting. Re-run after modifying the config.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            projectPath: { type: "string", description: "Path to the project directory (defaults to current working directory)" }
+          },
           required: [],
         },
       },
@@ -536,7 +651,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "omni_execute": {
         const args = request.params.arguments as any;
-        const opts = args.cwd ? { cwd: args.cwd } : {};
+        const opts: any = { env: sanitizeEnv(process.env) };
+        if (args.cwd) opts.cwd = args.cwd;
         let resultOutput = "";
         let exitCode = 0;
         
@@ -629,7 +745,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
          if (isRegex) flags.push("-E");
 
          try {
-            const { stdout, stderr } = await execFileAsync('grep', [...flags, query, targetPath]);
+            const { stdout, stderr } = await execFileAsync('grep', [...flags, query, targetPath], { env: sanitizeEnv(process.env) });
             let resultOutput = String(stdout);
             if (!resultOutput.trim()) resultOutput = "No matches found.";
             
@@ -660,7 +776,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
          
          try {
              // Basic find command
-             const { stdout } = await execFileAsync('find', [dir, '-name', pattern]);
+             const { stdout } = await execFileAsync('find', [dir, '-name', pattern], { env: sanitizeEnv(process.env) });
              const files = String(stdout).split("\n").filter(Boolean);
              const resultOutput = files.join(", ");
              const distilled = await distillText(resultOutput || "No files found.");
@@ -756,7 +872,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         let resultOutput = "";
         let exitCode = 0;
         try {
-          const { stdout, stderr } = await execAsync(command);
+          const { stdout, stderr } = await execAsync(command, { env: sanitizeEnv(process.env) });
           resultOutput = String(stdout) + (stderr ? "\nSTDERR:\n" + String(stderr) : "");
         } catch (e: any) {
           resultOutput = String(e.stdout || "") + (e.stderr ? "\nSTDERR:\n" + String(e.stderr) : "") + `\nExit code: ${e.code}`;
@@ -784,7 +900,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "run_command": {
         const args = request.params.arguments as any;
         const command = args.CommandLine;
-        const opts = args.Cwd ? { cwd: args.Cwd } : {};
+        const opts: any = { env: sanitizeEnv(process.env) };
+        if (args.Cwd) opts.cwd = args.Cwd;
         let resultOutput = "";
         let exitCode = 0;
         try {
@@ -822,7 +939,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
-      case "omni_trust": {
+      case "omni_trust_hooks": {
         try {
           if (!fs.existsSync(HOOKS_DIR)) {
             return { content: [{ type: "text", text: `No hooks directory found at ${HOOKS_DIR}. Nothing to trust.` }] };
@@ -847,6 +964,65 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return { content: [{ type: "text", text: `Successfully trusted ${Object.keys(hashes).length} hooks. Hashes saved to ${HOOKS_SHA_FILE}.` }] };
         } catch (e: any) {
           return { content: [{ type: "text", text: `Error updating trusted hashes: ${e.message}` }], isError: true };
+        }
+      }
+
+      case "omni_trust": {
+        const args = request.params.arguments as any;
+        const projectDir = path.resolve(args.projectPath || process.cwd());
+        const configPath = path.join(projectDir, "omni_config.json");
+
+        try {
+          if (!fs.existsSync(configPath)) {
+            return { content: [{ type: "text", text: `No omni_config.json found in ${projectDir}. Nothing to trust.` }] };
+          }
+
+          // Read and display the config for review
+          const rawConfig = fs.readFileSync(configPath, "utf-8");
+          const configHash = hashFileContent(configPath);
+          let parsedConfig: any;
+          try {
+            parsedConfig = JSON.parse(rawConfig);
+          } catch {
+            return { content: [{ type: "text", text: `Error: ${configPath} is not valid JSON.` }], isError: true };
+          }
+
+          const ruleCount = (parsedConfig.rules?.length || 0) + (parsedConfig.dsl_filters?.length || 0);
+
+          // Check existing trust status
+          const projects = loadTrustedProjects();
+          const existingIdx = projects.findIndex(p => path.resolve(p.path) === projectDir);
+          const wasAlreadyTrusted = existingIdx !== -1;
+
+          // Update or add trust entry
+          const entry: TrustedProject = {
+            path: projectDir,
+            configHash,
+            trustedAt: new Date().toISOString()
+          };
+
+          if (existingIdx !== -1) {
+            projects[existingIdx] = entry;
+          } else {
+            projects.push(entry);
+          }
+
+          saveTrustedProjects(projects);
+
+          // Force Wasm engine reload to pick up newly trusted config
+          wasmInstance = null;
+
+          const status = wasAlreadyTrusted ? "🔄 Re-trusted" : "✅ Trusted";
+          const report =
+            `${status} project: ${projectDir}\n` +
+            `Config: ${configPath}\n` +
+            `SHA-256: ${configHash}\n` +
+            `Rules: ${ruleCount} (${parsedConfig.rules?.length || 0} rules, ${parsedConfig.dsl_filters?.length || 0} DSL filters)\n` +
+            `\n--- Config Contents ---\n${JSON.stringify(parsedConfig, null, 2)}`;
+
+          return { content: [{ type: "text", text: report }] };
+        } catch (e: any) {
+          return { content: [{ type: "text", text: `Error trusting project: ${e.message}` }], isError: true };
         }
       }
 

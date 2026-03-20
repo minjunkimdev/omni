@@ -201,6 +201,8 @@ OMNI exposes high-density tools that replace standard agent context commands:
 | **`omni_execute`** | Run ANY command and distill its output. | Massive (30-90%) |
 | **`omni_read_file`** | Full file distillation (great for logs/SQL/json). | Massive |
 | **`omni_density`** | Measure gain and reduction metrics. | N/A |
+| **`omni_trust`** | Trust a project's local `omni_config.json` before loading. | N/A |
+| **`omni_trust_hooks`** | Verify SHA-256 hashes of hook scripts. | N/A |
 
 ---
 
@@ -259,32 +261,39 @@ You can manually edit these files to define `rules` (exact matching) or `dsl_fil
 
 ---
 
-## Security: Hook Integrity Workflow
+## Security: Trust Boundary
 
-OMNI provides a **Trust Boundary** by ensuring that any hook scripts executed through the system remain untampered.
+OMNI includes **three layers** of security to protect your AI agent from malicious inputs:
 
-### Why use Custom Hooks?
-Hooks are best used when OMNI's built-in filters aren't enough for your specific needs:
-- **AI DevSecOps**: Run a script like `scan-vulnerabilities.sh` that filters 1000 lines of security output into a 5-line summary for the AI.
-- **Infrastructure Polishing**: A script to clean up `terraform plan` or `kubectl` output to show only the "Intent-Critical" changes.
-- **Data Distillation**: Use a Python script to parse large JSON/XML responses from internal APIs and return only the relevant fields.
+### 1. Project Trust Boundary
+OMNI will **not** load project-local `omni_config.json` until you explicitly trust it. This prevents a cloned repository from injecting malicious filter rules.
 
-### Workflow:
-1. **Add Hooks**: Create the directory if it doesn't exist (`mkdir -p ~/.omni/hooks`) and place your custom scripts there.
-2. **Verify & Trust**: Use the `omni_trust` MCP tool to manually inspect and approve the scripts. This generates SHA-256 signatures in `~/.omni/hooks.sha256`.
-3. **Startup Protection**: Every time the OMNI MCP server starts, it re-calculates hashes and compares them to the trusted signatures.
-4. **Automatic Lockdown**: If any file is modified or an untrusted file is added, OMNI will log a security alert and **immediately exit** to prevent execution of tampered logic.
+**How to use:**
+1. Clone or open a project that has `omni_config.json`.
+2. OMNI will log: `⚠ Local config not trusted. Run omni_trust to review and trust.`
+3. Call the `omni_trust` MCP tool — it shows the config contents and SHA-256 hash.
+4. The project is now trusted. If you later edit the config, run `omni_trust` again.
+
+### 2. Sandbox Environment Denylist
+OMNI automatically strips **50+ dangerous environment variables** (`BASH_ENV`, `NODE_OPTIONS`, `LD_PRELOAD`, `DYLD_INSERT_LIBRARIES`, etc.) from all child processes. No configuration needed — this is always active.
+
+### 3. Hook Integrity Verification
+Custom hook scripts in `~/.omni/hooks/` are protected by SHA-256 fingerprinting.
+
+**How to use:**
+1. **Add Hooks**: Place your custom scripts in `~/.omni/hooks/`.
+2. **Verify & Trust**: Use the `omni_trust_hooks` MCP tool to inspect and approve the scripts. This generates SHA-256 signatures in `~/.omni/hooks.sha256`.
+3. **Startup Protection**: Every time OMNI starts, it re-calculates hashes and compares them to the trusted signatures.
+4. **Automatic Lockdown**: If any file is modified or an untrusted file is added, OMNI will **immediately exit**.
 
 > [!IMPORTANT]
 > **Modifying Hook Scripts?**
-> If you edit the content of your hook scripts, OMNI will block startup due to the fingerprint mismatch. You **must** run the `omni_trust` MCP tool again to re-authorize the updated scripts and generate new SHA-256 signatures.
+> If you edit the content of your hook scripts, OMNI will block startup due to the fingerprint mismatch. You **must** run the `omni_trust_hooks` MCP tool again to re-authorize the updated scripts.
 
 ### Best Practices: Custom Hooks
-To extend OMNI's capabilities safely using your own scripts, follow this workflow:
-
 1.  **Create**: Store your custom script (e.g., `git-summary.sh`) in `~/.omni/hooks/`.
 2.  **Test**: Verify the script works manually in your terminal.
-3.  **Authorize**: Run the `omni_trust` tool to sign the script's current state.
+3.  **Authorize**: Run the `omni_trust_hooks` tool to sign the script's current state.
 4.  **Execute**: Your AI Agent can now safely run the script via `omni_execute`:
     ```json
     {
