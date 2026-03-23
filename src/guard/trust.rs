@@ -4,11 +4,26 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(not(test))]
 fn get_trusted_file_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".omni")
         .join("trusted.json")
+}
+
+#[cfg(test)]
+thread_local! {
+    pub static TEST_TRUST_FILE: std::cell::RefCell<PathBuf> = std::cell::RefCell::new({
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("must succeed").as_nanos();
+        let tid = std::thread::current().id();
+        std::env::temp_dir().join(format!("omni_test_trusted_{:?}_{}.json", tid, nanos))
+    });
+}
+
+#[cfg(test)]
+fn get_trusted_file_path() -> PathBuf {
+    TEST_TRUST_FILE.with(|f| f.borrow().clone())
 }
 
 pub fn compute_hash(path: &Path) -> Result<String> {

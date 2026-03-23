@@ -224,7 +224,7 @@ mod tests {
         });
         let out = process_payload(&input.to_string(), None, None);
         assert!(out.is_some());
-        let res = out.unwrap();
+        let res = out.expect("must succeed");
         assert!(res.contains("hookEventName"));
         assert!(res.contains("PostToolUse"));
         assert!(res.contains("test.txt"));
@@ -286,7 +286,7 @@ mod tests {
             {"type": "text", "text": "world ".repeat(10)},
             {"type": "text", "text": "!"}
         ]);
-        let extracted = extract_content(&arr).unwrap();
+        let extracted = extract_content(&arr).expect("must succeed");
         assert!(extracted.contains("hello"));
         assert!(extracted.contains("world world"));
         assert!(extracted.ends_with("!"));

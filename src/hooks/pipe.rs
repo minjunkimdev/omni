@@ -73,7 +73,7 @@ pub fn run_inner<R: Read, W: Write, E: Write>(
     // 4. Run pipeline natively
     let ctype = classifier::classify(&input_text);
 
-    let active_session = session.as_ref().map(|s| s.lock().unwrap());
+    let active_session = session.as_ref().map(|s| s.lock().expect("must succeed"));
     let scored_segments = scorer::score_segments(&input_text, &ctype, active_session.as_deref());
 
     let compose_config = composer::ComposeConfig::default();
@@ -131,9 +131,9 @@ mod tests {
         let mut out = Vec::new();
         let mut err = Vec::new();
 
-        run_inner(input.as_bytes(), &mut out, &mut err, None, None).unwrap();
+        run_inner(input.as_bytes(), &mut out, &mut err, None, None).expect("must succeed");
 
-        let out_str = String::from_utf8(out).unwrap();
+        let out_str = String::from_utf8(out).expect("must succeed");
         // Native Git Diff outputs are normally kept natively, so reduction < original_text.len isn't guaranteed heavily
         // The pipe mode should successfully print it.
         assert!(out_str.contains("diff --git"));
@@ -146,8 +146,8 @@ mod tests {
         let mut out = Vec::new();
         let mut err = Vec::new();
 
-        run_inner(input.as_bytes(), &mut out, &mut err, None, None).unwrap();
-        let out_str = String::from_utf8(out).unwrap();
+        run_inner(input.as_bytes(), &mut out, &mut err, None, None).expect("must succeed");
+        let out_str = String::from_utf8(out).expect("must succeed");
 
         // No significant reduction for short inputs
         assert_eq!(out_str, input);

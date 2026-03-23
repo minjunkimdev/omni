@@ -161,9 +161,9 @@ mod tests {
     use tempfile::tempdir;
 
     fn get_store() -> (Arc<Store>, tempfile::TempDir) {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("must succeed");
         let db_path = dir.path().join("omni.db");
-        (Arc::new(Store::open_path(&db_path).unwrap()), dir)
+        (Arc::new(Store::open_path(&db_path).expect("must succeed")), dir)
     }
 
     fn default_config() -> SessionConfig {
@@ -208,7 +208,7 @@ mod tests {
 
         let out = process_payload(&input.to_string(), store.clone(), cfg);
         assert!(out.is_some());
-        let res = out.unwrap();
+        let res = out.expect("must succeed");
         assert!(res.contains("systemPromptAddition"));
         assert!(res.contains("missing semicolon"));
         assert!(res.contains("src/main.rs (1x)"));
@@ -235,7 +235,7 @@ mod tests {
         let out = process_payload(&input.to_string(), store.clone(), cfg);
         assert!(out.is_some());
 
-        let parsed: HookOutput = serde_json::from_str(&out.unwrap()).unwrap();
+        let parsed: HookOutput = serde_json::from_str(&out.expect("must succeed")).expect("must succeed");
         let summary_len = parsed.hook_specific_output.system_prompt_addition.len();
         assert!(summary_len <= 300, "Length was {}", summary_len);
     }
@@ -308,7 +308,7 @@ mod tests {
         assert!(out.is_some());
         // Since we explicitly added hot_file = secret.txt, it naturally tracks it.
         // No magic regex scrubbing mandated yet, so let it assert the correct structure is appended.
-        let output = out.unwrap();
+        let output = out.expect("must succeed");
         assert!(output.contains("Last: ran `cat secret.txt`"));
     }
 }

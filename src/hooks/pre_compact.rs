@@ -144,9 +144,9 @@ mod tests {
     use tempfile::tempdir;
 
     fn get_store() -> (Arc<Store>, tempfile::TempDir) {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("must succeed");
         let db_path = dir.path().join("omni.db");
-        (Arc::new(Store::open_path(&db_path).unwrap()), dir)
+        (Arc::new(Store::open_path(&db_path).expect("must succeed")), dir)
     }
 
     #[test]
@@ -160,8 +160,8 @@ mod tests {
             "compactionReason": "context_limit_reached"
         });
 
-        let out_str = process_payload(&input.to_string(), store, session).unwrap();
-        let parsed: HookOutput = serde_json::from_str(&out_str).unwrap();
+        let out_str = process_payload(&input.to_string(), store, session).expect("must succeed");
+        let parsed: HookOutput = serde_json::from_str(&out_str).expect("must succeed");
         assert_eq!(parsed.hook_specific_output.hook_event_name, "PreCompact");
         assert!(
             parsed
@@ -184,8 +184,8 @@ mod tests {
             "sessionId": "123"
         });
 
-        let out_str = process_payload(&input.to_string(), store, session).unwrap();
-        let parsed: HookOutput = serde_json::from_str(&out_str).unwrap();
+        let out_str = process_payload(&input.to_string(), store, session).expect("must succeed");
+        let parsed: HookOutput = serde_json::from_str(&out_str).expect("must succeed");
         assert!(parsed.hook_specific_output.system_prompt_addition.len() <= 500);
     }
 
@@ -202,7 +202,7 @@ mod tests {
             "sessionId": "123"
         });
 
-        let out_str = process_payload(&input.to_string(), store, session).unwrap();
+        let out_str = process_payload(&input.to_string(), store, session).expect("must succeed");
         assert!(out_str.contains("src/main.rs"));
         assert!(out_str.contains("src/lib.rs"));
     }
@@ -219,7 +219,7 @@ mod tests {
             "sessionId": "123"
         });
 
-        let out_str = process_payload(&input.to_string(), store, session).unwrap();
+        let out_str = process_payload(&input.to_string(), store, session).expect("must succeed");
         assert!(out_str.contains("missing semicolon at line 42"));
     }
 
@@ -239,7 +239,7 @@ mod tests {
         let _ = process_payload(&input.to_string(), store.clone(), session);
 
         // Verify state is saved in the DB
-        let latest = store.find_latest_session().unwrap();
+        let latest = store.find_latest_session().expect("must succeed");
         assert_eq!(latest.session_id, session_id);
     }
 
