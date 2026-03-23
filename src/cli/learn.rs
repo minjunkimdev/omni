@@ -37,10 +37,11 @@ pub fn run_learn(args: &[String]) -> Result<()> {
             let content = fs::read_to_string(&path)?;
             for line in content.lines() {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(line)
-                    && let Some(s) = val.get("sample").and_then(|v| v.as_str()) {
-                        input.push_str(s);
-                        input.push('\n');
-                    }
+                    && let Some(s) = val.get("sample").and_then(|v| v.as_str())
+                {
+                    input.push_str(s);
+                    input.push('\n');
+                }
             }
         } else {
             println!("No learn queue found at {:?}", path);

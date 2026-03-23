@@ -68,7 +68,7 @@ fn test_pipeline_handles_null_bytes() {
     let input = "normal text\x00with null\x00bytes";
     let output = run_pipeline(input);
     // Should not crash, output should be non-empty
-    assert!(!output.is_empty() || input.is_empty());
+    assert!(!output.is_empty());
 }
 
 #[test]

@@ -71,38 +71,38 @@ pub fn process_payload(input_str: &str, store: Arc<Store>, cfg: SessionConfig) -
     let mut prev_state: Option<SessionState> = None;
 
     if !cfg.force_fresh
-        && let Some(state) = store.find_latest_session() {
-            let age_mins = (now - state.last_active) / 60;
-            if cfg.force_continue || age_mins < cfg.ttl_mins {
-                should_continue = true;
-                prev_state = Some(state);
-            }
+        && let Some(state) = store.find_latest_session()
+    {
+        let age_mins = (now - state.last_active) / 60;
+        if cfg.force_continue || age_mins < cfg.ttl_mins {
+            should_continue = true;
+            prev_state = Some(state);
+        }
+    }
+
+    if should_continue && let Some(state) = prev_state {
+        let summary = build_summary(&state, now);
+        let mut summary_truncated = summary.trim().to_string();
+        if summary_truncated.len() > 300 {
+            summary_truncated.truncate(297);
+            summary_truncated.push_str("...");
         }
 
-    if should_continue
-        && let Some(state) = prev_state {
-            let summary = build_summary(&state, now);
-            let mut summary_truncated = summary.trim().to_string();
-            if summary_truncated.len() > 300 {
-                summary_truncated.truncate(297);
-                summary_truncated.push_str("...");
-            }
+        store.index_event(
+            &state.session_id,
+            "SessionStart",
+            "Continued previous session",
+        );
 
-            store.index_event(
-                &state.session_id,
-                "SessionStart",
-                "Continued previous session",
-            );
+        let out = HookOutput {
+            hook_specific_output: HookSpecificOutput {
+                hook_event_name: "SessionStart".to_string(),
+                system_prompt_addition: summary_truncated,
+            },
+        };
 
-            let out = HookOutput {
-                hook_specific_output: HookSpecificOutput {
-                    hook_event_name: "SessionStart".to_string(),
-                    system_prompt_addition: summary_truncated,
-                },
-            };
-
-            return serde_json::to_string(&out).ok();
-        }
+        return serde_json::to_string(&out).ok();
+    }
 
     // Fresh session logic
     // Create new store mapping bounds natively generating randomized timestamps SessionState ids.

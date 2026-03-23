@@ -366,9 +366,10 @@ impl Store {
         let mut out = Vec::new();
         for r in rows {
             if let Ok(j) = r
-                && let Ok(s) = serde_json::from_str::<SessionState>(&j) {
-                    out.push(s);
-                }
+                && let Ok(s) = serde_json::from_str::<SessionState>(&j)
+            {
+                out.push(s);
+            }
         }
         Ok(out)
     }

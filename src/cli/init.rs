@@ -108,9 +108,11 @@ pub fn check_status(val: &Value, exe_path: &str) -> (bool, bool, bool) {
                 if let Some(inner_arr) = v.get("hooks").and_then(|v2| v2.as_array()) {
                     for hook_def in inner_arr {
                         if let Some(cmd) = hook_def.get("command").and_then(|c| c.as_str())
-                            && cmd.contains(exe_path) && cmd.contains("--hook") {
-                                return true;
-                            }
+                            && cmd.contains(exe_path)
+                            && cmd.contains("--hook")
+                        {
+                            return true;
+                        }
                     }
                 }
             }
@@ -175,23 +177,24 @@ pub fn install_omni_hooks(val: &mut Value, exe_path: &str) {
 
 pub fn remove_omni_hooks(val: &mut Value) {
     if let Some(obj) = val.as_object_mut()
-        && let Some(hooks) = obj.get_mut("hooks").and_then(|h| h.as_object_mut()) {
-            for (_key, arr_val) in hooks.iter_mut() {
-                if let Some(arr) = arr_val.as_array_mut() {
-                    arr.retain(|v| {
-                        if let Some(inner) = v.get("hooks").and_then(|h| h.as_array()) {
-                            !inner.iter().any(|h| {
-                                h.get("command")
-                                    .and_then(|c| c.as_str())
-                                    .is_some_and(|c| c.contains("omni") && c.contains("--hook"))
-                            })
-                        } else {
-                            true
-                        }
-                    });
-                }
+        && let Some(hooks) = obj.get_mut("hooks").and_then(|h| h.as_object_mut())
+    {
+        for (_key, arr_val) in hooks.iter_mut() {
+            if let Some(arr) = arr_val.as_array_mut() {
+                arr.retain(|v| {
+                    if let Some(inner) = v.get("hooks").and_then(|h| h.as_array()) {
+                        !inner.iter().any(|h| {
+                            h.get("command")
+                                .and_then(|c| c.as_str())
+                                .is_some_and(|c| c.contains("omni") && c.contains("--hook"))
+                        })
+                    } else {
+                        true
+                    }
+                });
             }
         }
+    }
 }
 
 #[cfg(test)]

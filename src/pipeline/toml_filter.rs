@@ -146,17 +146,19 @@ impl TomlFilter {
 
         // 5. max_lines
         if let Some(max) = self.max_lines
-            && lines.len() > max {
-                lines.truncate(max);
-            }
+            && lines.len() > max
+        {
+            lines.truncate(max);
+        }
 
         let result = lines.join("\n");
 
         // 6. on_empty
         if result.trim().is_empty()
-            && let Some(fallback) = &self.on_empty {
-                return fallback.clone();
-            }
+            && let Some(fallback) = &self.on_empty
+        {
+            return fallback.clone();
+        }
 
         result
     }
@@ -498,7 +500,6 @@ mod tests {
         // It should just safely evaluate into an empty/populated array without panicking.
         let _filters = load_all_filters();
         // Just verify it doesn't crash traversing systems.
-
     }
 
     #[test]
@@ -508,6 +509,5 @@ mod tests {
         // The project local load won't pick up mock files if `omni_config.json` doesn't exist/trust.
         let _filters = load_all_filters();
         // Evaluates successfully cleanly
-
     }
 }

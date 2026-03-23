@@ -146,11 +146,12 @@ pub fn run() -> anyhow::Result<()> {
     for p in &[mcp_path, mcpa_path] {
         if p.exists()
             && let Ok(c) = fs::read_to_string(p)
-                && (c.contains("omni --mcp") || c.contains("omni\"")) {
-                    mcp_found = true;
-                    println!(" MCP Server:    {} (registered) [OK]\n", p.display());
-                    break;
-                }
+            && (c.contains("omni --mcp") || c.contains("omni\""))
+        {
+            mcp_found = true;
+            println!(" MCP Server:    {} (registered) [OK]\n", p.display());
+            break;
+        }
     }
     if !mcp_found {
         println!(" MCP Server:    [WARNING] not found in config\n");

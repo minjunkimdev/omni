@@ -79,18 +79,19 @@ pub fn compose(
     let mut rewind_hash = None;
 
     if dropped_count > 0
-        && let Some(content) = dropped_content {
-            if let Some(s) = store {
-                let hash = s.store_rewind(&content);
-                output.push_str(&format!(
-                    "\n[OMNI: {} lines omitted — omni_retrieve(\"{}\") for full output]\n",
-                    dropped_lines, hash
-                ));
-                rewind_hash = Some(hash);
-            } else {
-                output.push_str(&format!("\n[OMNI: {} lines omitted]\n", dropped_lines));
-            }
+        && let Some(content) = dropped_content
+    {
+        if let Some(s) = store {
+            let hash = s.store_rewind(&content);
+            output.push_str(&format!(
+                "\n[OMNI: {} lines omitted — omni_retrieve(\"{}\") for full output]\n",
+                dropped_lines, hash
+            ));
+            rewind_hash = Some(hash);
+        } else {
+            output.push_str(&format!("\n[OMNI: {} lines omitted]\n", dropped_lines));
         }
+    }
 
     if output.len() > config.max_output_chars {
         output.truncate(config.max_output_chars);

@@ -45,12 +45,13 @@ fn extract_content(value: &serde_json::Value) -> Option<String> {
         for item in arr {
             if let Some(obj) = item.as_object()
                 && let Some(t) = obj.get("type")
-                    && t == "text"
-                        && let Some(text) = obj.get("text")
-                            && let Some(s) = text.as_str() {
-                                out.push_str(s);
-                                out.push('\n');
-                            }
+                && t == "text"
+                && let Some(text) = obj.get("text")
+                && let Some(s) = text.as_str()
+            {
+                out.push_str(s);
+                out.push('\n');
+            }
         }
         if out.is_empty() {
             return None;
@@ -145,16 +146,17 @@ pub fn process_payload(
     let latency_ms = start.elapsed().as_millis() as u32;
 
     if let Some(ref lock) = session
-        && let Ok(mut state) = lock.lock() {
-            if !command.is_empty() {
-                state.add_command(&command);
-            }
-            for seg in &scored_segments {
-                if seg.tier == crate::pipeline::SignalTier::Critical {
-                    state.add_error(&seg.content);
-                }
+        && let Ok(mut state) = lock.lock()
+    {
+        if !command.is_empty() {
+            state.add_command(&command);
+        }
+        for seg in &scored_segments {
+            if seg.tier == crate::pipeline::SignalTier::Critical {
+                state.add_error(&seg.content);
             }
         }
+    }
 
     if let Some(ref s) = store {
         let result = DistillResult {
@@ -194,7 +196,8 @@ pub fn process_payload(
             hook_event_name: "PostToolUse",
             updated_response: final_out,
         },
-    }).ok()
+    })
+    .ok()
 }
 
 #[cfg(test)]

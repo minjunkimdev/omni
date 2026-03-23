@@ -221,9 +221,10 @@ pub fn infer_domain(session: &SessionState) -> Option<String> {
     let paths: Vec<String> = session.hot_files.keys().cloned().collect();
     if paths.is_empty() || paths.len() < 2 {
         if let Some(first) = paths.first()
-            && let Some(pos) = first.rfind('/') {
-                return Some(first[..pos].to_string());
-            }
+            && let Some(pos) = first.rfind('/')
+        {
+            return Some(first[..pos].to_string());
+        }
         return None;
     }
 

@@ -102,7 +102,12 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
 
     for seg in segments {
         if seg.content.starts_with("diff --git") {
-            if let Some(file) = seg.content.lines().next().and_then(|l| l.split(' ').next_back()) {
+            if let Some(file) = seg
+                .content
+                .lines()
+                .next()
+                .and_then(|l| l.split(' ').next_back())
+            {
                 files.insert(file.to_string());
                 out.push_str(&format!("{}\n", file)); // Just output the filename instead of whole header
             }
@@ -132,12 +137,12 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
                 hunk_out.push('\n');
             } else if keep_context
                 && !line.starts_with("+++")
-                    && !line.starts_with("---")
-                    && !line.starts_with("index")
-                {
-                    hunk_out.push_str(line);
-                    hunk_out.push('\n');
-                }
+                && !line.starts_with("---")
+                && !line.starts_with("index")
+            {
+                hunk_out.push_str(line);
+                hunk_out.push('\n');
+            }
         }
         out.push_str(&hunk_out);
     }
