@@ -167,27 +167,40 @@ fn main() {
                     Ok(store) => {
                         if let Err(e) = cli::stats::run(&args, &store) {
                             eprintln!("[omni] Stats error: {}", e);
+                            std::process::exit(1);
                         }
                     }
-                    Err(e) => eprintln!("[omni] Cannot open database for stats: {}", e),
+                    Err(e) => {
+                        eprintln!("[omni] Cannot open database for stats: {}", e);
+                        std::process::exit(1);
+                    }
                 },
 
-                "session" => {
-                    if let Ok(store) = Store::open() {
+                "session" => match Store::open() {
+                    Ok(store) => {
                         let store_arc = Arc::new(store);
-                        let _ = cli::session::run_session(&args, store_arc);
+                        if let Err(e) = cli::session::run_session(&args, store_arc) {
+                            eprintln!("[omni] Session error: {}", e);
+                            std::process::exit(1);
+                        }
                     }
-                }
+                    Err(e) => {
+                        eprintln!("[omni] Cannot open database for session: {}", e);
+                        std::process::exit(1);
+                    }
+                },
 
                 "learn" => {
                     if let Err(e) = cli::learn::run_learn(&args) {
                         eprintln!("[omni] Auto-Learn error: {}", e);
+                        std::process::exit(1);
                     }
                 }
 
                 "doctor" => {
                     if let Err(e) = cli::doctor::run() {
                         eprintln!("[omni] Doctor error: {}", e);
+                        std::process::exit(1);
                     }
                 }
 

@@ -246,16 +246,33 @@ fn test_cli_doctor_runs() {
 
 #[test]
 fn test_cli_stats_no_crash() {
+    let temp_db = std::env::temp_dir().join("omni_test_stats.db");
+    if temp_db.exists() {
+        let _ = std::fs::remove_file(&temp_db);
+    }
+
     let output = Command::new(omni_binary())
         .arg("stats")
+        .env("OMNI_DB_PATH", &temp_db)
         .output()
         .expect("Failed to run");
 
-    assert!(output.status.success(), "Stats should exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "Stats should exit 0. Stderr: {}",
+        stderr
+    );
     assert!(
         stdout.contains("Signal Report") || stdout.contains("OMNI"),
-        "Stats should show report header. Output: {}",
-        stdout
+        "Stats should show report header. Stdout: {}\nStderr: {}",
+        stdout,
+        stderr
     );
+
+    if temp_db.exists() {
+        let _ = std::fs::remove_file(&temp_db);
+    }
 }
