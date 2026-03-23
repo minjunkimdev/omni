@@ -156,23 +156,33 @@ See [docs/FILTERS.md](docs/FILTERS.md) for the complete filter writing guide.
 
 ```bash
 $ omni stats
-─────────────────────────────────────────────────
- OMNI Signal Report — last 30 days
-─────────────────────────────────────────────────
- Commands processed:  1,247
- Input:              18.4 MB
- Output:              3.2 MB
- Signal ratio:       82.6% reduction
- Est. cost saved:    $0.046 (@$3/1M tokens)
- Avg latency:        2.1ms
- RewindStore:        23 items stored, 8 retrieved
 
- By filter:
-  1. git          203x  89%  ████████████████████
-  2. build         89x  82%  ████████████████
-  3. test          44x  79%  ███████████████
-  4. infra         31x  76%  █████████████
-─────────────────────────────────────────────────
+ ───────────────────────────────────────────────── 
+ 📊 OMNI Signal Report — last 30 days
+ ───────────────────────────────────────────────── 
+  Commands processed:  1,247
+  Data Distilled:      18.4 MB → 3.2 MB
+  Signal Ratio:        82.6% reduction
+  Estimated Savings:   $0.046 USD
+  Average Latency:     2.1ms
+  RewindStore:         23 archived / 8 retrieved
+
+ 🔍 By Filter:
+   1. git          203x  89%  ████████████████████
+   2. build         89x  82%  ████████████████
+   3. test          44x  79%  ███████████████
+   4. infra         31x  76%  █████████████
+
+ 🛣️  Route Distribution:
+  Distill:        1247  (97%)
+  Keep:             25  ( 2%)
+  Drop:             12  ( 1%)
+  Passthrough:       0  ( 0%)
+
+ 📂 Session Insights:
+  Hot files:  src/auth/mod.rs (12), tests/auth_test.rs (8)
+
+ ───────────────────────────────────────────────── 
 ```
 
 ## Supported Agents

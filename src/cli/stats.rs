@@ -76,38 +76,96 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
     // Rewind
     let (rewind_stored, rewind_retrieved) = store.rewind_metrics()?;
 
-    println!("─────────────────────────────────────────────────");
-    println!(" OMNI Signal Report — {}", period_label);
-    println!("─────────────────────────────────────────────────");
-    println!(" Commands processed:  {}", format_number(count));
-    println!(" Input:              {}", format_bytes(input_total));
-    println!(" Output:             {}", format_bytes(output_total));
-    println!(" Signal ratio:       {:.1}% reduction", reduction_pct);
-    println!(" Est. cost saved:    ${:.3} (@$3/1M tokens)", cost_saved);
-    println!(" Avg latency:        {:.1}ms", avg_latency);
+    use colored::*;
+
     println!(
-        " RewindStore:        {} items stored, {} retrieved",
-        rewind_stored, rewind_retrieved
+        "\n{}",
+        " ───────────────────────────────────────────────── ".bright_black()
+    );
+    println!(
+        " {} {}",
+        "📊".bright_blue(),
+        format!("OMNI Signal Report — {}", period_label)
+            .bold()
+            .bright_white()
+    );
+    println!(
+        "{}",
+        " ───────────────────────────────────────────────── ".bright_black()
+    );
+
+    println!(
+        "  {:<20} {}",
+        "Commands processed:".bright_black(),
+        format_number(count).bold().cyan()
+    );
+    println!(
+        "  {:<20} {} {} {}",
+        "Data Distilled:".bright_black(),
+        format_bytes(input_total).red(),
+        "→".bright_black(),
+        format_bytes(output_total).green()
+    );
+
+    let ratio_msg = format!("{:.1}% reduction", reduction_pct);
+    let ratio_colored = if reduction_pct > 70.0 {
+        ratio_msg.bold().bright_green()
+    } else if reduction_pct > 40.0 {
+        ratio_msg.bold().bright_yellow()
+    } else {
+        ratio_msg.bold().bright_red()
+    };
+
+    println!("  {:<20} {}", "Signal Ratio:".bright_black(), ratio_colored);
+    println!(
+        "  {:<20} {}",
+        "Estimated Savings:".bright_black(),
+        format!("${:.3} USD", cost_saved).bold().bright_cyan()
+    );
+    println!(
+        "  {:<20} {}",
+        "Average Latency:".bright_black(),
+        format!("{:.1}ms", avg_latency).bright_blue()
+    );
+
+    println!(
+        "  {:<20} {}",
+        "RewindStore:".bright_black(),
+        format!(
+            "{} archived / {} retrieved",
+            rewind_stored, rewind_retrieved
+        )
+        .bright_magenta()
     );
 
     // Filter breakdown
     let filters = store.filter_breakdown(since)?;
     if !filters.is_empty() {
-        println!("\n By filter:");
+        println!(
+            "\n {} {}",
+            "🔍".bright_yellow(),
+            "By Filter:".bold().bright_white()
+        );
         for (i, (name, cnt, pct)) in filters.iter().enumerate() {
             let bar = format_bar(*pct);
-            let suffix = if name == "passthrough" || name == "unknown" {
-                "  ← run: omni learn"
+            let bar_colored = if *pct > 80.0 {
+                bar.bright_green()
             } else {
-                ""
+                bar.bright_yellow()
             };
+            let suffix = if name == "passthrough" || name == "unknown" {
+                " ← learn?".bright_black().italic()
+            } else {
+                "".clear()
+            };
+
             println!(
-                "  {}. {:<14} {:>4}x  {:>3.0}%  {}{}",
+                "  {:>2}. {:<12} {:>4}x  {:>3.0}%  {}{}",
                 i + 1,
-                name,
+                name.bright_cyan(),
                 cnt,
                 pct,
-                bar,
+                bar_colored,
                 suffix
             );
         }
@@ -117,59 +175,54 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
     let routes = store.route_distribution(since)?;
     if !routes.is_empty() {
         let total_routes: u64 = routes.iter().map(|(_, c)| c).sum();
-        println!("\n Routes:");
+        println!(
+            "\n {} {}",
+            "🛣️ ".bright_magenta(),
+            "Route Distribution:".bold().bright_white()
+        );
         for (route, cnt) in &routes {
             let pct = if total_routes > 0 {
                 *cnt as f64 / total_routes as f64 * 100.0
             } else {
                 0.0
             };
-            println!("  {:<15} {:>5}  ({:.0}%)", format!("{}:", route), cnt, pct);
+            let route_color = match route.to_lowercase().as_str() {
+                "distill" | "keep" => route.bright_green(),
+                "rewind" => route.bright_blue(),
+                "drop" => route.bright_red(),
+                _ => route.bright_black(),
+            };
+            println!(
+                "  {:<15} {:>5}  ({:>3.0}%)",
+                format!("{}:", route_color),
+                cnt,
+                pct
+            );
         }
     }
 
     // Session insights (--session or default)
     if show_session || !show_passthrough {
         let hot_files = store.hot_files_global(since)?;
-        if !hot_files.is_empty() || rewind_retrieved > 0 {
-            println!("\n Session insights:");
-            if !hot_files.is_empty() {
-                let files_str: Vec<String> = hot_files
-                    .iter()
-                    .map(|(f, c)| format!("{} ({}x)", f, c))
-                    .collect();
-                println!("  Hot files:      {}", files_str.join(", "));
-            }
-            if rewind_retrieved > 0 {
-                println!(
-                    "  Accuracy signals: {} RewindStore retrievals (OMNI terlalu agresif?)",
-                    rewind_retrieved
-                );
-            }
+        if !hot_files.is_empty() {
+            println!(
+                "\n {} {}",
+                "📂".bright_blue(),
+                "Session Insights:".bold().bright_white()
+            );
+            let files_str: Vec<String> = hot_files
+                .iter()
+                .take(3)
+                .map(|(f, c)| format!("{} ({})", f.bright_cyan(), c.to_string().bright_black()))
+                .collect();
+            println!("  Hot files:  {}", files_str.join(", "));
         }
     }
 
-    // Passthrough candidates
-    if show_passthrough {
-        let candidates = store.passthrough_candidates(since)?;
-        if candidates.is_empty() {
-            println!("\n  No passthrough commands found in this period.");
-        } else {
-            println!("\n  Commands without filter:");
-            for (i, (cmd, cnt)) in candidates.iter().enumerate() {
-                let short = if cmd.len() > 30 { &cmd[..30] } else { cmd };
-                println!(
-                    "   {}. {} ({}x)  → run: omni learn < {}.log",
-                    i + 1,
-                    short,
-                    cnt,
-                    short.split_whitespace().next().unwrap_or("cmd")
-                );
-            }
-        }
-    }
-
-    println!("─────────────────────────────────────────────────");
+    println!(
+        "{}",
+        " ───────────────────────────────────────────────── ".bright_black()
+    );
     Ok(())
 }
 
