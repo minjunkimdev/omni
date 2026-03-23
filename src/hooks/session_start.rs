@@ -70,18 +70,17 @@ pub fn process_payload(input_str: &str, store: Arc<Store>, cfg: SessionConfig) -
     let mut should_continue = false;
     let mut prev_state: Option<SessionState> = None;
 
-    if !cfg.force_fresh {
-        if let Some(state) = store.find_latest_session() {
+    if !cfg.force_fresh
+        && let Some(state) = store.find_latest_session() {
             let age_mins = (now - state.last_active) / 60;
             if cfg.force_continue || age_mins < cfg.ttl_mins {
                 should_continue = true;
                 prev_state = Some(state);
             }
         }
-    }
 
-    if should_continue {
-        if let Some(state) = prev_state {
+    if should_continue
+        && let Some(state) = prev_state {
             let summary = build_summary(&state, now);
             let mut summary_truncated = summary.trim().to_string();
             if summary_truncated.len() > 300 {
@@ -104,7 +103,6 @@ pub fn process_payload(input_str: &str, store: Arc<Store>, cfg: SessionConfig) -
 
             return serde_json::to_string(&out).ok();
         }
-    }
 
     // Fresh session logic
     // Create new store mapping bounds natively generating randomized timestamps SessionState ids.

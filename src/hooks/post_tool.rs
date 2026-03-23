@@ -43,18 +43,14 @@ fn extract_content(value: &serde_json::Value) -> Option<String> {
     if let Some(arr) = value.as_array() {
         let mut out = String::new();
         for item in arr {
-            if let Some(obj) = item.as_object() {
-                if let Some(t) = obj.get("type") {
-                    if t == "text" {
-                        if let Some(text) = obj.get("text") {
-                            if let Some(s) = text.as_str() {
+            if let Some(obj) = item.as_object()
+                && let Some(t) = obj.get("type")
+                    && t == "text"
+                        && let Some(text) = obj.get("text")
+                            && let Some(s) = text.as_str() {
                                 out.push_str(s);
                                 out.push('\n');
                             }
-                        }
-                    }
-                }
-            }
         }
         if out.is_empty() {
             return None;
@@ -81,19 +77,12 @@ pub fn process_payload(
         return None;
     }
 
-    let raw_val = match parsed
+    let raw_val = parsed
         .tool_response
         .as_ref()
-        .and_then(|r| r.content.as_ref())
-    {
-        Some(v) => v,
-        None => return None,
-    };
+        .and_then(|r| r.content.as_ref())?;
 
-    let content = match extract_content(raw_val) {
-        Some(c) => c,
-        None => return None,
-    };
+    let content = extract_content(raw_val)?;
 
     if content.len() < 50 {
         return None;
@@ -155,8 +144,8 @@ pub fn process_payload(
 
     let latency_ms = start.elapsed().as_millis() as u32;
 
-    if let Some(ref lock) = session {
-        if let Ok(mut state) = lock.lock() {
+    if let Some(ref lock) = session
+        && let Ok(mut state) = lock.lock() {
             if !command.is_empty() {
                 state.add_command(&command);
             }
@@ -166,7 +155,6 @@ pub fn process_payload(
                 }
             }
         }
-    }
 
     if let Some(ref s) = store {
         let result = DistillResult {
@@ -201,15 +189,12 @@ pub fn process_payload(
         s.record_distillation(&session_id, &result, &command);
     }
 
-    match serde_json::to_string(&HookOutput {
+    serde_json::to_string(&HookOutput {
         hook_specific_output: HookSpecificOutput {
             hook_event_name: "PostToolUse",
             updated_response: final_out,
         },
-    }) {
-        Ok(j) => Some(j),
-        Err(_) => None,
-    }
+    }).ok()
 }
 
 #[cfg(test)]

@@ -1,9 +1,8 @@
-use crate::pipeline::toml_filter::TomlFilter;
 use regex::Regex;
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -172,7 +171,7 @@ pub fn queue_for_learn(input: &str, command: &str) {
         });
 
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
-            let _ = writeln!(file, "{}", entry.to_string());
+            let _ = writeln!(file, "{}", entry);
         }
     });
 }
@@ -215,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_apply_to_config_tidak_duplicate_trigger() {
-        let mut file = NamedTempFile::new().unwrap();
+        let file = NamedTempFile::new().unwrap();
         let c = vec![PatternCandidate {
             trigger_prefix: "Test".to_string(),
             sample_line: "x".to_string(),

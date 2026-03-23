@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -145,20 +145,18 @@ impl TomlFilter {
         }
 
         // 5. max_lines
-        if let Some(max) = self.max_lines {
-            if lines.len() > max {
+        if let Some(max) = self.max_lines
+            && lines.len() > max {
                 lines.truncate(max);
             }
-        }
 
         let result = lines.join("\n");
 
         // 6. on_empty
-        if result.trim().is_empty() {
-            if let Some(fallback) = &self.on_empty {
+        if result.trim().is_empty()
+            && let Some(fallback) = &self.on_empty {
                 return fallback.clone();
             }
-        }
 
         result
     }
@@ -288,7 +286,7 @@ pub fn load_from_dir(dir: &Path) -> Vec<TomlFilter> {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "toml") {
+            if path.extension().is_some_and(|ext| ext == "toml") {
                 match load_from_file(&path) {
                     Ok(mut filters) => all_filters.append(&mut filters),
                     Err(e) => eprintln!("[omni] skip file {}: {}", path.display(), e),
@@ -498,9 +496,9 @@ mod tests {
     fn test_load_all_filters_priority_project_gt_user_gt_built_in() {
         // Without mocking environment extensively, we test `load_all_filters` logic by its output conceptually.
         // It should just safely evaluate into an empty/populated array without panicking.
-        let filters = load_all_filters();
+        let _filters = load_all_filters();
         // Just verify it doesn't crash traversing systems.
-        assert!(filters.len() >= 0);
+
     }
 
     #[test]
@@ -508,8 +506,8 @@ mod tests {
         // Mocking an untrusted `.omni/filters` configuration.
         // Because trust evaluates `is_trusted` false by default locally for unknown bounfores.
         // The project local load won't pick up mock files if `omni_config.json` doesn't exist/trust.
-        let filters = load_all_filters();
+        let _filters = load_all_filters();
         // Evaluates successfully cleanly
-        assert!(filters.len() >= 0);
+
     }
 }

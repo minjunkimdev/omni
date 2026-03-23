@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 use crate::pipeline::{DistillResult, SessionState};
@@ -366,11 +365,10 @@ impl Store {
 
         let mut out = Vec::new();
         for r in rows {
-            if let Ok(j) = r {
-                if let Ok(s) = serde_json::from_str::<SessionState>(&j) {
+            if let Ok(j) = r
+                && let Ok(s) = serde_json::from_str::<SessionState>(&j) {
                     out.push(s);
                 }
-            }
         }
         Ok(out)
     }
@@ -479,10 +477,8 @@ impl Store {
         };
 
         let mut results = Vec::new();
-        for event in event_iter {
-            if let Ok(content) = event {
-                results.push(content);
-            }
+        for content in event_iter.flatten() {
+            results.push(content);
         }
         results
     }
@@ -517,10 +513,8 @@ impl Store {
                 total_output_bytes: row.get(3)?,
             })
         })?;
-        for row in rows {
-            if let Ok(stats) = row {
-                by_filter.push(stats);
-            }
+        for stats in rows.flatten() {
+            by_filter.push(stats);
         }
 
         let mut by_route = Vec::new();
@@ -532,10 +526,8 @@ impl Store {
                 count: row.get(1)?,
             })
         })?;
-        for row in rows {
-            if let Ok(stats) = row {
-                by_route.push(stats);
-            }
+        for stats in rows.flatten() {
+            by_route.push(stats);
         }
 
         let mut passthrough_commands = Vec::new();
@@ -545,10 +537,8 @@ impl Store {
              GROUP BY command ORDER BY c DESC LIMIT 10",
         )?;
         let rows = stmt.query_map(params![ts_threshold], |row| Ok((row.get(0)?, row.get(1)?)))?;
-        for row in rows {
-            if let Ok(stats) = row {
-                passthrough_commands.push(stats);
-            }
+        for stats in rows.flatten() {
+            passthrough_commands.push(stats);
         }
 
         Ok(StoreSummary {

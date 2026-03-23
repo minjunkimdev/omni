@@ -7,7 +7,7 @@ use crate::pipeline::{SessionState, classifier, composer, scorer};
 use crate::store::sqlite::Store;
 
 const MAX_PIPE_SIZE: usize = 16 * 1024 * 1024; // 16MB
-const WARN_PIPE_SIZE: usize = 1 * 1024 * 1024; // 1MB
+const WARN_PIPE_SIZE: usize = 1024 * 1024; // 1MB
 
 pub fn run(store: Option<Arc<Store>>, session: Option<Arc<Mutex<SessionState>>>) -> Result<()> {
     let stdin = std::io::stdin().lock();

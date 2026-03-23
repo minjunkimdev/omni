@@ -71,7 +71,7 @@ fn distill_status(input: &str) -> String {
         untracked.len()
     );
 
-    let top_staged = (&staged)
+    let top_staged = staged
         .iter()
         .take(5)
         .cloned()
@@ -81,7 +81,7 @@ fn distill_status(input: &str) -> String {
         out.push_str(&format!("\nStaged: {}", top_staged));
     }
 
-    let top_mod = (&modified)
+    let top_mod = modified
         .iter()
         .take(5)
         .cloned()
@@ -102,7 +102,7 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
 
     for seg in segments {
         if seg.content.starts_with("diff --git") {
-            if let Some(file) = seg.content.lines().next().and_then(|l| l.split(' ').last()) {
+            if let Some(file) = seg.content.lines().next().and_then(|l| l.split(' ').next_back()) {
                 files.insert(file.to_string());
                 out.push_str(&format!("{}\n", file)); // Just output the filename instead of whole header
             }
@@ -130,15 +130,14 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
                 removed += 1;
                 hunk_out.push_str(line);
                 hunk_out.push('\n');
-            } else if keep_context {
-                if !line.starts_with("+++")
+            } else if keep_context
+                && !line.starts_with("+++")
                     && !line.starts_with("---")
                     && !line.starts_with("index")
                 {
                     hunk_out.push_str(line);
                     hunk_out.push('\n');
                 }
-            }
         }
         out.push_str(&hunk_out);
     }

@@ -1,5 +1,5 @@
 pub const MAX_INPUT: usize = 16 * 1024 * 1024; // 16MB
-pub const WARN_INPUT: usize = 1 * 1024 * 1024; // 1MB
+pub const WARN_INPUT: usize = 1024 * 1024; // 1MB
 
 pub enum InputCheck {
     Ok,

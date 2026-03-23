@@ -96,6 +96,7 @@ pub fn run() -> anyhow::Result<()> {
 
     // 4. Hook entries in ~/.claude/settings.json
     println!(" Hooks (Claude Code):");
+    #[allow(clippy::match_single_binding)]
     match get_settings_path() {
         path => {
             if path.exists() {
@@ -143,15 +144,13 @@ pub fn run() -> anyhow::Result<()> {
 
     let mut mcp_found = false;
     for p in &[mcp_path, mcpa_path] {
-        if p.exists() {
-            if let Ok(c) = fs::read_to_string(p) {
-                if c.contains("omni --mcp") || c.contains("omni\"") {
+        if p.exists()
+            && let Ok(c) = fs::read_to_string(p)
+                && (c.contains("omni --mcp") || c.contains("omni\"")) {
                     mcp_found = true;
                     println!(" MCP Server:    {} (registered) [OK]\n", p.display());
                     break;
                 }
-            }
-        }
     }
     if !mcp_found {
         println!(" MCP Server:    [WARNING] not found in config\n");
@@ -164,7 +163,7 @@ pub fn run() -> anyhow::Result<()> {
     let all_filters = crate::pipeline::toml_filter::load_all_filters();
     let mut built_in = 0;
     let mut user: usize = 0;
-    let mut local = 0;
+    let _local = 0;
 
     for f in &all_filters {
         if f.name.starts_with("sys_") {

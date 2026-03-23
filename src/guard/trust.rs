@@ -48,11 +48,10 @@ pub fn is_trusted(project_path: &Path) -> bool {
     };
 
     let proj_key = project_path.to_string_lossy().to_string();
-    if let Some(trusted_hash) = trusted_map.get(&proj_key) {
-        if trusted_hash == &current_hash {
+    if let Some(trusted_hash) = trusted_map.get(&proj_key)
+        && trusted_hash == &current_hash {
             return true;
         }
-    }
 
     false
 }

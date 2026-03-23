@@ -1,5 +1,5 @@
-use crate::pipeline::SessionState;
 use crate::store::sqlite::Store;
+use crate::pipeline::SessionState;
 use chrono::{Local, TimeZone, Utc};
 use std::sync::Arc;
 

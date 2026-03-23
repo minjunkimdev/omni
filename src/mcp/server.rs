@@ -153,6 +153,7 @@ impl OmniServer {
 }
 
 // Requires async_trait natively for rmcp handlers
+#[allow(refining_impl_trait)]
 impl ServerHandler for OmniServer {
     fn call_tool<'a>(
         &'a self,
