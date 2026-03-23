@@ -41,22 +41,54 @@ mod tests {
                 let segments = scorer::score_segments(input, &$ctype, None);
                 let distiller = get_distiller(&$ctype);
                 let output = distiller.distill(&segments, input);
-                
+
                 insta::assert_snapshot!(output);
-                
+
                 if $ctype == ContentType::GitDiff {
-                    assert!(output.len() < input.len() * 60 / 100, 
-                        "Git diff distiller must achieve >40% reduction (now {} len vs initial {})", output.len(), input.len());
+                    assert!(
+                        output.len() < input.len() * 60 / 100,
+                        "Git diff distiller must achieve >40% reduction (now {} len vs initial {})",
+                        output.len(),
+                        input.len()
+                    );
                 }
             }
-        }
+        };
     }
 
-    snapshot_test!(test_git_diff_distillation, "git_diff_multi_file.txt", ContentType::GitDiff);
-    snapshot_test!(test_git_status_distillation, "git_status_dirty.txt", ContentType::GitStatus);
-    snapshot_test!(test_cargo_build_distillation, "cargo_build_errors.txt", ContentType::BuildOutput);
-    snapshot_test!(test_pytest_distillation, "pytest_failures.txt", ContentType::TestOutput);
-    snapshot_test!(test_kubectl_distillation, "kubectl_pods_mixed.txt", ContentType::InfraOutput);
-    snapshot_test!(test_docker_build_distillation, "docker_build_layered.txt", ContentType::InfraOutput);
-    snapshot_test!(test_nginx_log_distillation, "nginx_access_log.txt", ContentType::LogOutput);
+    snapshot_test!(
+        test_git_diff_distillation,
+        "git_diff_multi_file.txt",
+        ContentType::GitDiff
+    );
+    snapshot_test!(
+        test_git_status_distillation,
+        "git_status_dirty.txt",
+        ContentType::GitStatus
+    );
+    snapshot_test!(
+        test_cargo_build_distillation,
+        "cargo_build_errors.txt",
+        ContentType::BuildOutput
+    );
+    snapshot_test!(
+        test_pytest_distillation,
+        "pytest_failures.txt",
+        ContentType::TestOutput
+    );
+    snapshot_test!(
+        test_kubectl_distillation,
+        "kubectl_pods_mixed.txt",
+        ContentType::InfraOutput
+    );
+    snapshot_test!(
+        test_docker_build_distillation,
+        "docker_build_layered.txt",
+        ContentType::InfraOutput
+    );
+    snapshot_test!(
+        test_nginx_log_distillation,
+        "nginx_access_log.txt",
+        ContentType::LogOutput
+    );
 }

@@ -82,18 +82,30 @@ fn extract_file_paths(text: &str) -> Vec<String> {
     let mut paths = HashSet::new();
     for cap in FILE_PATH_RE.captures_iter(text) {
         if let Some(m) = cap.get(0) {
-            let mut path = m.as_str().trim_start_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '/').to_string();
-            path = path.trim_end_matches(|c: char| !c.is_alphanumeric()).to_string();
+            let mut path = m
+                .as_str()
+                .trim_start_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '/')
+                .to_string();
+            path = path
+                .trim_end_matches(|c: char| !c.is_alphanumeric())
+                .to_string();
             if !path.is_empty() {
                 paths.insert(path);
             }
         }
     }
-    
+
     // Fallback naive search if regex bounds struggle (cargo uses specific outputs)
     let words = text.split_whitespace();
     for w in words {
-        if w.contains('.') && (w.ends_with(".rs") || w.ends_with(".py") || w.ends_with(".js") || w.ends_with(".ts") || w.ends_with(".tsx") || w.ends_with(".jsx")) {
+        if w.contains('.')
+            && (w.ends_with(".rs")
+                || w.ends_with(".py")
+                || w.ends_with(".js")
+                || w.ends_with(".ts")
+                || w.ends_with(".tsx")
+                || w.ends_with(".jsx"))
+        {
             let clean = w.trim_matches(|c| c == '\'' || c == '"' || c == '(' || c == ')');
             paths.insert(clean.to_string());
         }
@@ -110,11 +122,11 @@ fn extract_errors(text: &str) -> Vec<String> {
 
     for line in lines {
         let trimmed = line.trim();
-        let is_start = trimmed.starts_with("error[") 
-            || trimmed.starts_with("ERROR:") 
-            || trimmed.starts_with("Error:") 
-            || trimmed.contains("FAILED") 
-            || trimmed.contains("panic:") 
+        let is_start = trimmed.starts_with("error[")
+            || trimmed.starts_with("ERROR:")
+            || trimmed.starts_with("Error:")
+            || trimmed.contains("FAILED")
+            || trimmed.contains("panic:")
             || trimmed.starts_with("Traceback");
 
         if is_start {
@@ -171,7 +183,9 @@ pub fn infer_task(session: &SessionState) -> Option<String> {
 
     let has_cargo_test = cmds.iter().any(|c| c.contains("cargo test"));
     let has_git_diff = cmds.iter().any(|c| c.contains("git diff"));
-    let has_npm_build = cmds.iter().any(|c| c.contains("npm run build") || c.contains("npm build"));
+    let has_npm_build = cmds
+        .iter()
+        .any(|c| c.contains("npm run build") || c.contains("npm build"));
     let has_kubectl = cmds.iter().any(|c| c.contains("kubectl"));
 
     if has_cargo_test {
@@ -194,7 +208,13 @@ pub fn infer_task(session: &SessionState) -> Option<String> {
         task = Some(format!("running: {}", last));
     }
 
-    task.map(|t| if t.len() > 50 { t[..47].to_string() + "..." } else { t })
+    task.map(|t| {
+        if t.len() > 50 {
+            t[..47].to_string() + "..."
+        } else {
+            t
+        }
+    })
 }
 
 pub fn infer_domain(session: &SessionState) -> Option<String> {
@@ -210,7 +230,7 @@ pub fn infer_domain(session: &SessionState) -> Option<String> {
 
     let min_len = paths.iter().map(|p| p.len()).min().unwrap_or(0);
     let mut prefix_len = 0;
-    
+
     // We should compute common prefix bounded by characters
     let first = &paths[0];
     for r in 0..=min_len {
@@ -289,7 +309,7 @@ mod tests {
         state.add_hot_file("src/auth/mod.rs");
         state.add_hot_file("src/auth/jwt.rs");
         state.add_hot_file("src/auth/middleware.rs");
-        
+
         let domain = infer_domain(&state);
         // prefix -> "src/auth/"
         // split -> ["src", "auth"] -> last is "auth"
@@ -301,7 +321,7 @@ mod tests {
         let mut state = SessionState::new();
         state.add_command("cargo test auth");
         state.add_error("missing semicolon");
-        
+
         let task = infer_task(&state);
         assert_eq!(task.unwrap(), "fixing rust tests");
     }
@@ -311,9 +331,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = Arc::new(Store::open_path(&dir.path().join("omni.db")).unwrap());
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let tracker = SessionTracker::new(session, store);
-        
+
         let start = std::time::Instant::now();
         let res = DistillResult {
             output: "".to_string(),
@@ -329,11 +349,11 @@ mod tests {
             segments_kept: 0,
             segments_dropped: 0,
         };
-        
+
         tracker.track_command("git status", "On branch main", &res);
         let elapsed = start.elapsed();
         // Should be extremely fast because thread spawns
-        assert!(elapsed.as_millis() < 50, "Took {} ms", elapsed.as_millis()); 
+        assert!(elapsed.as_millis() < 50, "Took {} ms", elapsed.as_millis());
     }
 
     #[test]

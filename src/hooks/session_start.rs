@@ -53,13 +53,7 @@ impl SessionConfig {
     }
 }
 
-
-
-pub fn process_payload(
-    input_str: &str,
-    store: Arc<Store>,
-    cfg: SessionConfig,
-) -> Option<String> {
+pub fn process_payload(input_str: &str, store: Arc<Store>, cfg: SessionConfig) -> Option<String> {
     let parsed: HookInput = match serde_json::from_str(input_str) {
         Ok(p) => p,
         Err(_) => {
@@ -165,8 +159,8 @@ fn build_summary(state: &SessionState, now: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use serde_json::json;
+    use tempfile::tempdir;
 
     fn get_store() -> (Arc<Store>, tempfile::TempDir) {
         let dir = tempdir().unwrap();
@@ -314,7 +308,7 @@ mod tests {
         cfg.force_continue = true;
         let out = process_payload(&input.to_string(), store.clone(), cfg);
         assert!(out.is_some());
-        // Since we explicitly added hot_file = secret.txt, it naturally tracks it. 
+        // Since we explicitly added hot_file = secret.txt, it naturally tracks it.
         // No magic regex scrubbing mandated yet, so let it assert the correct structure is appended.
         let output = out.unwrap();
         assert!(output.contains("Last: ran `cat secret.txt`"));

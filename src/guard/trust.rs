@@ -1,6 +1,6 @@
 use anyhow::Result;
-use std::collections::HashMap;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ pub fn compute_hash(path: &Path) -> Result<String> {
 pub fn is_trusted(project_path: &Path) -> bool {
     let target_file = project_path.join("omni_config.json");
     if !target_file.exists() {
-        // Technically if no config, it's not overriding anything maliciously. 
+        // Technically if no config, it's not overriding anything maliciously.
         // But the trust system checks if the local config is safely tracked.
         return false; // Or true depending on logic. The prompt implies false if unknown.
     }
@@ -93,7 +93,7 @@ mod tests {
         // Create an untrusted omni_config.json
         let cfg = dir.path().join("omni_config.json");
         fs::write(&cfg, "{}").unwrap();
-        
+
         // Since trusted.json in ~/.omni doesn't contain it, is_trusted is false!
         assert!(!is_trusted(dir.path()));
     }
@@ -101,14 +101,14 @@ mod tests {
     #[test]
     fn test_trust_project_and_is_trusted_roundtrip() {
         // Override home dir for tests to avoid writing to real ~/.omni/trusted.json
-        // Wait, since we can't cleanly override home_dir globally across threads using env var natively without breaking things, 
+        // Wait, since we can't cleanly override home_dir globally across threads using env var natively without breaking things,
         // we'll run the test but cautiously. It's an integration-like test.
         // For actual safe tests, a custom home directory env var would be used.
         // Let's manually write a test relying on the actual path but using a unique temp string as project_path so it doesn't collide.
         let dir = tempdir().unwrap();
         let cfg = dir.path().join("omni_config.json");
         fs::write(&cfg, "{\"trusted\": true}").unwrap();
-        
+
         assert!(!is_trusted(dir.path()));
 
         let hash = trust_project(dir.path()).unwrap();
@@ -121,13 +121,13 @@ mod tests {
         let dir = tempdir().unwrap();
         let cfg = dir.path().join("omni_config.json");
         fs::write(&cfg, "{\"trusted\": true}").unwrap();
-        
+
         let _ = trust_project(dir.path()).unwrap();
         assert!(is_trusted(dir.path()));
 
         // Modifikasi file
         fs::write(&cfg, "{\"trusted\": false, \"malicious\": true}").unwrap();
-        
+
         // Hash changed, is_trusted must be false!
         assert!(!is_trusted(dir.path()));
     }

@@ -11,8 +11,8 @@ use std::env;
 use std::io::{self, IsTerminal};
 use std::sync::{Arc, Mutex};
 
-use crate::store::sqlite::Store;
 use crate::pipeline::SessionState;
+use crate::store::sqlite::Store;
 
 // ─── Mode Detection ─────────────────────────────────────
 
@@ -47,7 +47,9 @@ fn detect_mode(args: &[String]) -> Mode {
 fn init_globals() -> (Option<Arc<Store>>, Option<Arc<Mutex<SessionState>>>) {
     match Store::open() {
         Ok(store) => {
-            let session = store.find_latest_session().unwrap_or_else(SessionState::new);
+            let session = store
+                .find_latest_session()
+                .unwrap_or_else(SessionState::new);
             let store_arc = Arc::new(store);
             let session_arc = Arc::new(Mutex::new(session));
             (Some(store_arc), Some(session_arc))
@@ -59,7 +61,8 @@ fn init_globals() -> (Option<Arc<Store>>, Option<Arc<Mutex<SessionState>>>) {
 // ─── Help Text ──────────────────────────────────────────
 
 fn print_help() {
-    println!(r#"omni {} — Less noise. More signal. Right signal.
+    println!(
+        r#"omni {} — Less noise. More signal. Right signal.
 
 USAGE:
   omni [MODE] [COMMAND] [FLAGS]
@@ -83,7 +86,9 @@ PIPE MODE (automatic):
 Quick start:
   brew install omni
   omni init --hook   # Setup Claude Code hooks
-  omni stats         # View savings after first session"#, env!("CARGO_PKG_VERSION"));
+  omni stats         # View savings after first session"#,
+        env!("CARGO_PKG_VERSION")
+    );
 }
 
 // ─── Main ───────────────────────────────────────────────
@@ -156,16 +161,14 @@ fn main() {
                     let _ = cli::init::run_init(&args);
                 }
 
-                "stats" => {
-                    match Store::open() {
-                        Ok(store) => {
-                            if let Err(e) = cli::stats::run(&args, &store) {
-                                eprintln!("[omni] Stats error: {}", e);
-                            }
+                "stats" => match Store::open() {
+                    Ok(store) => {
+                        if let Err(e) = cli::stats::run(&args, &store) {
+                            eprintln!("[omni] Stats error: {}", e);
                         }
-                        Err(e) => eprintln!("[omni] Cannot open database for stats: {}", e),
                     }
-                }
+                    Err(e) => eprintln!("[omni] Cannot open database for stats: {}", e),
+                },
 
                 "session" => {
                     if let Ok(store) = Store::open() {
@@ -187,7 +190,10 @@ fn main() {
                 }
 
                 unknown => {
-                    eprintln!("omni: unknown command '{}'\nRun 'omni help' for usage.", unknown);
+                    eprintln!(
+                        "omni: unknown command '{}'\nRun 'omni help' for usage.",
+                        unknown
+                    );
                     std::process::exit(1);
                 }
             }

@@ -179,7 +179,9 @@ pub fn score_segments(
                             SignalTier::Context => 0.4,
                             SignalTier::Noise => 0.05,
                         };
-                        let context_score = session.map(|s| s.context_boost(&current_chunk)).unwrap_or(0.0);
+                        let context_score = session
+                            .map(|s| s.context_boost(&current_chunk))
+                            .unwrap_or(0.0);
 
                         segments.push(OutputSegment {
                             content: current_chunk.clone(),
@@ -207,7 +209,9 @@ pub fn score_segments(
                     SignalTier::Context => 0.4,
                     SignalTier::Noise => 0.05,
                 };
-                let context_score = session.map(|s| s.context_boost(&current_chunk)).unwrap_or(0.0);
+                let context_score = session
+                    .map(|s| s.context_boost(&current_chunk))
+                    .unwrap_or(0.0);
 
                 segments.push(OutputSegment {
                     content: current_chunk,
@@ -260,7 +264,10 @@ mod tests {
 
     #[test]
     fn test_classify_line_warning_variants_to_important() {
-        assert_eq!(classify_line("warning[E123]: unused import"), SignalTier::Important);
+        assert_eq!(
+            classify_line("warning[E123]: unused import"),
+            SignalTier::Important
+        );
         assert_eq!(classify_line("diff --git a/b"), SignalTier::Important);
         assert_eq!(classify_line("✓ success"), SignalTier::Important);
     }
@@ -281,7 +288,7 @@ mod tests {
     fn test_score_line_with_context_tanpa_session() {
         let score = score_line_with_context("error:", SignalTier::Critical, None);
         assert_eq!(score, 0.9);
-        
+
         let score = score_line_with_context("normal", SignalTier::Context, None);
         assert_eq!(score, 0.4);
     }
@@ -301,7 +308,11 @@ mod tests {
     fn test_score_line_with_context_dengan_session_boost_active_error() {
         let mut session = SessionState::new();
         session.add_error("missing semicolon");
-        let score = score_line_with_context("compiler says missing semicolon", SignalTier::Context, Some(&session));
+        let score = score_line_with_context(
+            "compiler says missing semicolon",
+            SignalTier::Context,
+            Some(&session),
+        );
         assert!(score > 0.4); // exact is 0.4 + 0.25 => 0.65
     }
 
@@ -318,7 +329,7 @@ mod tests {
     fn test_score_segments_git_diff_split_by_hunk() {
         let diff = "diff --git a/file.txt b/file.txt\nindex 1234..5678\n@@ -1,3 +1,4 @@\n line1\n line2\n@@ -10,2 +11,3 @@\n line10\n line11";
         let segments = score_segments(diff, &ContentType::GitDiff, None);
-        
+
         assert_eq!(segments.len(), 3);
         // Header
         assert!(segments[0].content.starts_with("diff --git"));
@@ -339,7 +350,7 @@ mod tests {
         }
         session.add_error("E0432");
         session.add_error("missing semicolon");
-        
+
         let boost = session.context_boost("src/main.rs has missing semicolon and E0432");
         assert!(boost <= 0.4);
     }

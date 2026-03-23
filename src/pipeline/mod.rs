@@ -1,6 +1,6 @@
 pub mod classifier;
-pub mod scorer;
 pub mod composer;
+pub mod scorer;
 pub mod toml_filter;
 
 use serde::{Deserialize, Serialize};
@@ -25,17 +25,17 @@ pub enum ContentType {
 // 2. Signal tier — how important this segment is
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SignalTier {
-    Noise,       // Progress, compiling boring deps — drop
-    Context,     // Supporting lines — include if space allows
-    Important,   // Warning, changed file — biasanya include
-    Critical,    // Error, exception, FAILED — selalu include
+    Noise,     // Progress, compiling boring deps — drop
+    Context,   // Supporting lines — include if space allows
+    Important, // Warning, changed file — biasanya include
+    Critical,  // Error, exception, FAILED — selalu include
 }
 
 // 3. Route — path distilasi
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Route {
     Keep,        // score >= 0.7, full distillation
-    Soft,        // 0.3–0.69, labeled distillation  
+    Soft,        // 0.3–0.69, labeled distillation
     Passthrough, // < 0.3, raw + learn trigger
     Rewind,      // aggressively compressed, stored in RewindStore
     Error,       // engine error, raw preserved
@@ -73,7 +73,7 @@ pub struct OutputSegment {
     pub content: String,
     pub tier: SignalTier,
     pub base_score: f32,
-    pub context_score: f32,  // boost for session context
+    pub context_score: f32, // boost for session context
     pub line_range: (usize, usize),
 }
 
@@ -81,11 +81,11 @@ impl OutputSegment {
     pub fn final_score(&self) -> f32 {
         (self.base_score + self.context_score).clamp(0.0, 1.0)
     }
-    
+
     pub fn mentions(&self, path: &str) -> bool {
         self.content.contains(path)
     }
-    
+
     pub fn is_diagnostic(&self) -> bool {
         matches!(self.tier, SignalTier::Critical | SignalTier::Important)
     }
@@ -99,7 +99,7 @@ pub struct DistillResult {
     pub filter_name: String,
     pub content_type: ContentType,
     pub score: f32,
-    pub context_score: f32,    // for session scorer
+    pub context_score: f32, // for session scorer
     pub input_bytes: usize,
     pub output_bytes: usize,
     pub latency_ms: u64,
@@ -110,10 +110,12 @@ pub struct DistillResult {
 
 impl DistillResult {
     pub fn savings_pct(&self) -> f64 {
-        if self.input_bytes == 0 { return 0.0; }
+        if self.input_bytes == 0 {
+            return 0.0;
+        }
         (1.0 - self.output_bytes as f64 / self.input_bytes as f64) * 100.0
     }
-    
+
     pub fn is_meaningful(&self) -> bool {
         // Return false if there is no significant compression (< 10%)
         self.output_bytes < (self.input_bytes as f64 * 0.90) as usize
@@ -126,20 +128,20 @@ pub struct SessionState {
     pub session_id: String,
     pub started_at: i64,
     pub last_active: i64,
-    
+
     // Inferred context
     pub inferred_task: Option<String>,   // "fix auth bug"
     pub inferred_domain: Option<String>, // "authentication"
-    
-    // Hot files (path → access count)  
+
+    // Hot files (path → access count)
     pub hot_files: BTreeMap<String, u32>,
-    
+
     // Recent errors to boost relevance
-    pub active_errors: Vec<String>,      // last 5 error messages
-    
+    pub active_errors: Vec<String>, // last 5 error messages
+
     // Command history
     pub command_count: u32,
-    pub last_commands: Vec<String>,      // last 20 commands
+    pub last_commands: Vec<String>, // last 20 commands
 }
 
 impl SessionState {
@@ -153,7 +155,7 @@ impl SessionState {
             ..Default::default()
         }
     }
-    
+
     // Score boost from session context for a text
     pub fn context_boost(&self, text: &str) -> f32 {
         let mut boost = 0.0f32;
@@ -172,16 +174,17 @@ impl SessionState {
         }
         boost.min(0.4)
     }
-    
+
     pub fn add_hot_file(&mut self, path: &str) {
         *self.hot_files.entry(path.to_string()).or_insert(0) += 1;
     }
-    
+
     pub fn add_error(&mut self, error: &str) {
-        self.active_errors.insert(0, error[..error.len().min(200)].to_string());
+        self.active_errors
+            .insert(0, error[..error.len().min(200)].to_string());
         self.active_errors.truncate(5);
     }
-    
+
     pub fn add_command(&mut self, cmd: &str) {
         self.command_count += 1;
         self.last_commands.insert(0, cmd.to_string());

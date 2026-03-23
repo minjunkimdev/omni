@@ -1,10 +1,10 @@
+use crate::pipeline::toml_filter::TomlFilter;
+use regex::Regex;
+use serde_json::json;
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use regex::Regex;
-use serde_json::json;
-use crate::pipeline::toml_filter::TomlFilter;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum LearnAction {
@@ -48,7 +48,7 @@ pub fn detect_patterns(input: &str) -> Vec<PatternCandidate> {
     }
 
     let mut candidates = Vec::new();
-    
+
     // 5. Filter: count >= 3
     for (prefix, (count, sample)) in frequency {
         if count >= 3 {
@@ -58,9 +58,9 @@ pub fn detect_patterns(input: &str) -> Vec<PatternCandidate> {
             } else {
                 LearnAction::Strip
             };
-            
+
             let confidence = if count > 10 { 0.95 } else { 0.85 };
-            
+
             candidates.push(PatternCandidate {
                 trigger_prefix: prefix,
                 sample_line: sample,
@@ -82,9 +82,12 @@ pub fn generate_toml(candidates: &[PatternCandidate], filter_name: &str) -> Stri
     toml.push_str(&format!("match_command = \"{}.*\"\n", filter_name));
     toml.push_str("strip_ansi = true\n");
     toml.push_str("confidence = 0.85\n\n");
-    
+
     let mut strips = Vec::new();
-    let mut tests = format!("\n[[tests.{}]\nname = \"auto_learned_strip\"\n", filter_name);
+    let mut tests = format!(
+        "\n[[tests.{}]\nname = \"auto_learned_strip\"\n",
+        filter_name
+    );
     let mut sample_lines = String::new();
 
     for c in candidates {
@@ -97,15 +100,24 @@ pub fn generate_toml(candidates: &[PatternCandidate], filter_name: &str) -> Stri
     if !strips.is_empty() {
         toml.push_str(&format!("strip_lines_matching = [{}]\n", strips.join(", ")));
     }
-    
+
     toml.push_str("max_lines = 50\n");
     if let Some(_first) = candidates.first() {
-         toml.push_str(&format!("on_empty = \"{}: dropped repetitive patterns\"\n", filter_name));
+        toml.push_str(&format!(
+            "on_empty = \"{}: dropped repetitive patterns\"\n",
+            filter_name
+        ));
     }
 
-    tests.push_str(&format!("input = \"\"\"\n{}\"\"\"\n", sample_lines.trim_end()));
+    tests.push_str(&format!(
+        "input = \"\"\"\n{}\"\"\"\n",
+        sample_lines.trim_end()
+    ));
     if let Some(_first) = candidates.first() {
-        tests.push_str(&format!("expected = \"{}: dropped repetitive patterns\"\n", filter_name));
+        tests.push_str(&format!(
+            "expected = \"{}: dropped repetitive patterns\"\n",
+            filter_name
+        ));
     } else {
         tests.push_str("expected = \"\"\n");
     }
@@ -119,10 +131,12 @@ pub fn apply_to_config(
     filter_name: &str,
     config_path: &Path,
 ) -> anyhow::Result<usize> {
-    if candidates.is_empty() { return Ok(0); }
-    
+    if candidates.is_empty() {
+        return Ok(0);
+    }
+
     let generated = generate_toml(candidates, filter_name);
-    
+
     if config_path.exists() {
         let mut file = OpenOptions::new().append(true).open(config_path)?;
         writeln!(file, "\n{}", generated)?;
@@ -132,27 +146,31 @@ pub fn apply_to_config(
         }
         fs::write(config_path, generated)?;
     }
-    
+
     Ok(candidates.len())
 }
 
 pub fn queue_for_learn(input: &str, command: &str) {
-    if input.len() <= 200 { return; }
-    
+    if input.len() <= 200 {
+        return;
+    }
+
     let input_clone = input.chars().take(2000).collect::<String>();
     let cmd = command.to_string();
-    
+
     std::thread::spawn(move || {
-        let dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".omni");
+        let dir = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".omni");
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("learn_queue.jsonl");
-        
+
         let entry = json!({
             "ts": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
             "command": cmd,
             "sample": input_clone,
         });
-        
+
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
             let _ = writeln!(file, "{}", entry.to_string());
         }
@@ -199,8 +217,11 @@ mod tests {
     fn test_apply_to_config_tidak_duplicate_trigger() {
         let mut file = NamedTempFile::new().unwrap();
         let c = vec![PatternCandidate {
-            trigger_prefix: "Test".to_string(), sample_line: "x".to_string(),
-            count: 3, confidence: 0.9, suggested_action: LearnAction::Strip,
+            trigger_prefix: "Test".to_string(),
+            sample_line: "x".to_string(),
+            count: 3,
+            confidence: 0.9,
+            suggested_action: LearnAction::Strip,
         }];
         apply_to_config(&c, "dummy", file.path()).unwrap();
         let content = fs::read_to_string(file.path()).unwrap();

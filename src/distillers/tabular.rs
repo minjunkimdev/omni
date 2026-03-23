@@ -1,5 +1,5 @@
-use crate::pipeline::{ContentType, OutputSegment};
 use crate::distillers::Distiller;
+use crate::pipeline::{ContentType, OutputSegment};
 
 pub struct TabularDistiller;
 
@@ -11,7 +11,7 @@ impl Distiller for TabularDistiller {
     fn distill(&self, segments: &[OutputSegment], _input: &str) -> String {
         let mut out = String::new();
         let max_rows = 20;
-        
+
         for (i, seg) in segments.iter().enumerate() {
             if i < max_rows {
                 let cleaned = seg.content.split_whitespace().collect::<Vec<_>>().join(" ");

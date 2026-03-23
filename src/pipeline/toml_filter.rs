@@ -1,9 +1,9 @@
-use std::path::Path;
-use std::fs;
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Deserialize)]
 struct TomlDocument {
@@ -21,16 +21,16 @@ struct FilterConfig {
     strip_ansi: bool,
     #[serde(default = "default_confidence")]
     confidence: f32,
-    
+
     #[serde(default)]
     match_output: Vec<MatchOutputConfig>,
-    
+
     #[serde(default)]
     replace_rules: Vec<ReplaceRuleConfig>,
-    
+
     strip_lines_matching: Option<Vec<String>>,
     keep_lines_matching: Option<Vec<String>>,
-    
+
     max_lines: Option<usize>,
     on_empty: Option<String>,
 }
@@ -96,7 +96,9 @@ impl TomlFilter {
     }
 
     pub fn score(&self, input: &str) -> f32 {
-        if input.is_empty() { return 0.0; }
+        if input.is_empty() {
+            return 0.0;
+        }
         let sample = self.apply(input);
         let ratio = 1.0 - (sample.len() as f32 / input.len().max(1) as f32);
         (ratio * self.confidence).clamp(0.0, 1.0)
@@ -104,7 +106,7 @@ impl TomlFilter {
 
     pub fn apply(&self, input: &str) -> String {
         let mut text = input.to_string();
-        
+
         // 1. strip_ansi
         if self.strip_ansi {
             let ansi_re = Regex::new(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])").unwrap();
@@ -119,7 +121,11 @@ impl TomlFilter {
         // 3. match_output (short-circuits)
         for rule in &self.match_output {
             if rule.pattern.is_match(&text) {
-                let skip = rule.unless.as_ref().map(|u| u.is_match(&text)).unwrap_or(false);
+                let skip = rule
+                    .unless
+                    .as_ref()
+                    .map(|u| u.is_match(&text))
+                    .unwrap_or(false);
                 if !skip {
                     return rule.message.clone();
                 }
@@ -146,30 +152,30 @@ impl TomlFilter {
         }
 
         let result = lines.join("\n");
-        
+
         // 6. on_empty
         if result.trim().is_empty() {
             if let Some(fallback) = &self.on_empty {
                 return fallback.clone();
             }
         }
-        
+
         result
     }
 }
 
 pub fn load_from_file(path: &Path) -> Result<Vec<TomlFilter>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+
     let doc: TomlDocument = toml::from_str(&content)
         .with_context(|| format!("Failed to parse TOML in {}", path.display()))?;
-    
+
     let mut results = Vec::new();
-    
+
     if let Some(filters) = doc.filters {
         let mut tests_map = doc.tests.unwrap_or_default();
-        
+
         for (name, config) in filters {
             let match_regex = match Regex::new(&config.match_command) {
                 Ok(r) => r,
@@ -178,28 +184,36 @@ pub fn load_from_file(path: &Path) -> Result<Vec<TomlFilter>> {
                     continue;
                 }
             };
-            
+
             let mut replace_rules = Vec::new();
             let mut replace_failed = false;
             for rr in config.replace_rules {
                 match Regex::new(&rr.pattern) {
                     Ok(r) => replace_rules.push((r, rr.replacement)),
                     Err(e) => {
-                        eprintln!("[omni] skip invalid replace regex in filter '{}': {}", name, e);
+                        eprintln!(
+                            "[omni] skip invalid replace regex in filter '{}': {}",
+                            name, e
+                        );
                         replace_failed = true;
                         break;
                     }
                 }
             }
-            if replace_failed { continue; }
-            
+            if replace_failed {
+                continue;
+            }
+
             let mut match_output = Vec::new();
             let mut mo_failed = false;
             for mo in config.match_output {
                 let pattern = match Regex::new(&mo.pattern) {
                     Ok(r) => r,
                     Err(e) => {
-                        eprintln!("[omni] skip invalid match_output pattern in '{}': {}", name, e);
+                        eprintln!(
+                            "[omni] skip invalid match_output pattern in '{}': {}",
+                            name, e
+                        );
                         mo_failed = true;
                         break;
                     }
@@ -208,31 +222,44 @@ pub fn load_from_file(path: &Path) -> Result<Vec<TomlFilter>> {
                     Some(u) => match Regex::new(&u) {
                         Ok(r) => Some(r),
                         Err(e) => {
-                            eprintln!("[omni] skip invalid match_output unless in '{}': {}", name, e);
+                            eprintln!(
+                                "[omni] skip invalid match_output unless in '{}': {}",
+                                name, e
+                            );
                             mo_failed = true;
                             break;
                         }
                     },
                     None => None,
                 };
-                match_output.push(MatchOutputRule { pattern, message: mo.message, unless });
+                match_output.push(MatchOutputRule {
+                    pattern,
+                    message: mo.message,
+                    unless,
+                });
             }
-            if mo_failed { continue; }
-            
+            if mo_failed {
+                continue;
+            }
+
             let line_filter = if let Some(strips) = config.strip_lines_matching {
                 let mut rules = Vec::new();
-                for s in strips { rules.push(Regex::new(&s).unwrap()); }
+                for s in strips {
+                    rules.push(Regex::new(&s).unwrap());
+                }
                 LineFilter::Strip(rules)
             } else if let Some(keeps) = config.keep_lines_matching {
                 let mut rules = Vec::new();
-                for k in keeps { rules.push(Regex::new(&k).unwrap()); }
+                for k in keeps {
+                    rules.push(Regex::new(&k).unwrap());
+                }
                 LineFilter::Keep(rules)
             } else {
                 LineFilter::None
             };
-            
+
             let inline_tests = tests_map.remove(&name).unwrap_or_default();
-            
+
             results.push(TomlFilter {
                 name,
                 description: config.description,
@@ -248,7 +275,7 @@ pub fn load_from_file(path: &Path) -> Result<Vec<TomlFilter>> {
             });
         }
     }
-    
+
     Ok(results)
 }
 
@@ -257,7 +284,7 @@ pub fn load_from_dir(dir: &Path) -> Vec<TomlFilter> {
     if !dir.exists() || !dir.is_dir() {
         return all_filters;
     }
-    
+
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -275,7 +302,7 @@ pub fn load_from_dir(dir: &Path) -> Vec<TomlFilter> {
 pub fn run_inline_tests(filters: &[TomlFilter]) -> TestReport {
     let mut passes = 0;
     let mut failures = Vec::new();
-    
+
     for filter in filters {
         for test in &filter.inline_tests {
             let actual = filter.apply(&test.input);
@@ -289,17 +316,17 @@ pub fn run_inline_tests(filters: &[TomlFilter]) -> TestReport {
             }
         }
     }
-    
+
     TestReport { passes, failures }
 }
 
 pub fn load_all_filters() -> Vec<TomlFilter> {
     let mut all = Vec::new();
-    
+
     // 1. .omni/filters/*.toml (project-local, if trusted)
     if let Ok(cwd) = std::env::current_dir() {
         let omni_config_path = cwd.join("omni_config.json");
-        // We evaluate project trust over omni_config.json conceptually 
+        // We evaluate project trust over omni_config.json conceptually
         // since `trust.rs` specifically hashes `omni_config.json`.
         // Alternatively, if the project is trusted, we load its filters directory.
         if crate::guard::trust::is_trusted(&omni_config_path) {
@@ -307,32 +334,32 @@ pub fn load_all_filters() -> Vec<TomlFilter> {
             all.append(&mut load_from_dir(&local_filters_dir));
         }
     }
-    
+
     // 2. ~/.omni/filters/*.toml (user-global)
     if let Some(mut home) = dirs::home_dir() {
         home.push(".omni");
         home.push("filters");
         all.append(&mut load_from_dir(&home));
     }
-    
+
     // 3. Built-in filters (for now loaded straight from standard `filters/` dir relative to project,
     // though in production we might `include_str!` or `include_dir!`. We use `filters/` path dynamically).
     if let Ok(cwd) = std::env::current_dir() {
         let default_filters = cwd.join("filters");
         all.append(&mut load_from_dir(&default_filters));
     }
-    
+
     // Remove duplicates based on name, honoring priority order (first loaded wins)
     let mut unique = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    
+
     for filter in all {
         if !seen.contains(&filter.name) {
             seen.insert(filter.name.clone());
             unique.push(filter);
         }
     }
-    
+
     unique
 }
 
@@ -346,12 +373,16 @@ mod tests {
     #[test]
     fn test_load_from_file_berhasil_for_valid_toml() {
         let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, r#"
+        writeln!(
+            file,
+            r#"
         schema_version = 1
         [filters.test1]
         match_command = "^deploy"
-        "#).unwrap();
-        
+        "#
+        )
+        .unwrap();
+
         let filters = load_from_file(file.path()).unwrap();
         assert_eq!(filters.len(), 1);
         assert_eq!(filters[0].name, "test1");
@@ -360,12 +391,16 @@ mod tests {
     #[test]
     fn test_load_from_file_skip_filter_yang_invalid_warning_no_crash() {
         let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, r#"
+        writeln!(
+            file,
+            r#"
         schema_version = 1
         [filters.test1]
         match_command = "(unclosed group"
-        "#).unwrap();
-        
+        "#
+        )
+        .unwrap();
+
         let filters = load_from_file(file.path()).unwrap();
         assert_eq!(filters.len(), 0); // Di-skip
     }
@@ -373,11 +408,17 @@ mod tests {
     #[test]
     fn test_tomlfilter_score_gt_0_for_matching_input() {
         let filter = TomlFilter {
-            name: "sc".to_string(), description: None, confidence: 0.8,
-            match_regex: Regex::new("").unwrap(), strip_ansi: false, replace_rules: vec![],
+            name: "sc".to_string(),
+            description: None,
+            confidence: 0.8,
+            match_regex: Regex::new("").unwrap(),
+            strip_ansi: false,
+            replace_rules: vec![],
             match_output: vec![],
             line_filter: LineFilter::Strip(vec![Regex::new("noisy").unwrap()]),
-            max_lines: None, on_empty: None, inline_tests: vec![],
+            max_lines: None,
+            on_empty: None,
+            inline_tests: vec![],
         };
         let input = "hello\nnoisy line\nworld";
         let score = filter.score(input);
@@ -386,12 +427,18 @@ mod tests {
 
     #[test]
     fn test_tomlfilter_apply_pipeline_stages_dalam_urutan() {
-         let filter = TomlFilter {
-            name: "sc".to_string(), description: None, confidence: 1.0,
-            match_regex: Regex::new("").unwrap(), strip_ansi: true, replace_rules: vec![],
+        let filter = TomlFilter {
+            name: "sc".to_string(),
+            description: None,
+            confidence: 1.0,
+            match_regex: Regex::new("").unwrap(),
+            strip_ansi: true,
+            replace_rules: vec![],
             match_output: vec![],
             line_filter: LineFilter::Strip(vec![Regex::new("noisy").unwrap()]),
-            max_lines: None, on_empty: None, inline_tests: vec![],
+            max_lines: None,
+            on_empty: None,
+            inline_tests: vec![],
         };
         let input = "\x1b[31mhello\x1b[0m\nnoisy\nworld";
         assert_eq!(filter.apply(input), "hello\nworld");
@@ -400,11 +447,21 @@ mod tests {
     #[test]
     fn test_match_output_short_circuit_sebelum_line_filter() {
         let filter = TomlFilter {
-            name: "sc".to_string(), description: None, confidence: 1.0,
-            match_regex: Regex::new("").unwrap(), strip_ansi: false, replace_rules: vec![],
-            match_output: vec![MatchOutputRule { pattern: Regex::new("SUCCESS").unwrap(), message: "done".to_string(), unless: None }],
+            name: "sc".to_string(),
+            description: None,
+            confidence: 1.0,
+            match_regex: Regex::new("").unwrap(),
+            strip_ansi: false,
+            replace_rules: vec![],
+            match_output: vec![MatchOutputRule {
+                pattern: Regex::new("SUCCESS").unwrap(),
+                message: "done".to_string(),
+                unless: None,
+            }],
             line_filter: LineFilter::Strip(vec![Regex::new("never reaches here").unwrap()]),
-            max_lines: None, on_empty: None, inline_tests: vec![],
+            max_lines: None,
+            on_empty: None,
+            inline_tests: vec![],
         };
         assert_eq!(filter.apply("Wait\nSUCCESS\nNoisy"), "done");
     }
@@ -414,8 +471,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let filters_dir = dir.path().join("filters");
         fs::create_dir(&filters_dir).unwrap();
-        
-        fs::write(filters_dir.join("test.toml"), r#"
+
+        fs::write(
+            filters_dir.join("test.toml"),
+            r#"
         schema_version = 1
         [filters.example]
         match_command = "^eval"
@@ -425,8 +484,10 @@ mod tests {
         name = "t1"
         input = "KEEP\nDROP\nKEEP"
         expected = "KEEP\nKEEP"
-        "#).unwrap();
-        
+        "#,
+        )
+        .unwrap();
+
         let loaded = load_from_dir(&filters_dir);
         let report = run_inline_tests(&loaded);
         assert_eq!(report.passes, 1);

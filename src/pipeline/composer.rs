@@ -7,10 +7,7 @@ pub struct RewindDecision {
     pub threshold: f32, // segments below this go to RewindStore
 }
 
-pub fn decide_rewind(
-    segments: &[OutputSegment],
-    _content_type: &ContentType,
-) -> RewindDecision {
+pub fn decide_rewind(segments: &[OutputSegment], _content_type: &ContentType) -> RewindDecision {
     let total = segments.len().max(1) as f32;
     let noise_count = segments.iter().filter(|s| s.final_score() < 0.3).count();
     let noise_ratio = noise_count as f32 / total;
@@ -23,8 +20,8 @@ pub fn decide_rewind(
 }
 
 pub struct ComposeConfig {
-    pub threshold: f32,           // segments di bawah threshold di-drop
-    pub max_output_chars: usize,  // 50000 chars max (safety)
+    pub threshold: f32,          // segments di bawah threshold di-drop
+    pub max_output_chars: usize, // 50000 chars max (safety)
     pub rewind_store: Option<Arc<Store>>,
 }
 
@@ -50,7 +47,7 @@ pub fn compose(
     if segments.is_empty() && !original_text.is_empty() {
         return ("".to_string(), None); // Fully dropped
     }
-    
+
     // Auto-Learn execution: evaluates Passthrough outputs > 200 chars identifying potential noise natively.
     if matches!(route, ContentType::Unknown) && original_text.len() > 200 {
         crate::session::learn::queue_for_learn(original_text, "omni_passthrough_eval");
@@ -110,7 +107,12 @@ mod tests {
     use crate::pipeline::SignalTier;
     use tempfile::tempdir;
 
-    fn create_segment(content: &str, tier: SignalTier, base_score: f32, line: usize) -> OutputSegment {
+    fn create_segment(
+        content: &str,
+        tier: SignalTier,
+        base_score: f32,
+        line: usize,
+    ) -> OutputSegment {
         OutputSegment {
             content: content.to_string(),
             tier,
@@ -149,7 +151,14 @@ mod tests {
             create_segment("C", SignalTier::Noise, 0.2, 3),
         ];
 
-        let (out, _) = compose(segments, None, &ComposeConfig::default(), None, "", &ContentType::Unknown);
+        let (out, _) = compose(
+            segments,
+            None,
+            &ComposeConfig::default(),
+            None,
+            "",
+            &ContentType::Unknown,
+        );
         assert_eq!(out, "B\n");
     }
 
@@ -165,8 +174,15 @@ mod tests {
         ];
 
         let dropped = Some("ignored noise".to_string());
-        let (out, hash) = compose(segments, dropped, &ComposeConfig::default(), Some(&store), "", &ContentType::Unknown);
-        
+        let (out, hash) = compose(
+            segments,
+            dropped,
+            &ComposeConfig::default(),
+            Some(&store),
+            "",
+            &ContentType::Unknown,
+        );
+
         assert!(out.contains("bad loop"));
         assert!(!out.contains("ignored noise")); // Not in main output
         assert!(out.contains("[OMNI: 1 lines omitted — omni_retrieve("));
@@ -180,7 +196,14 @@ mod tests {
             create_segment("Critical 1", SignalTier::Important, 0.8, 1),
         ];
 
-        let (out, _) = compose(segments, None, &ComposeConfig::default(), None, "", &ContentType::Unknown);
+        let (out, _) = compose(
+            segments,
+            None,
+            &ComposeConfig::default(),
+            None,
+            "",
+            &ContentType::Unknown,
+        );
         assert_eq!(out, "Critical 1\nCritical 2\n");
     }
 
@@ -203,7 +226,14 @@ mod tests {
 
     #[test]
     fn test_compose_dengan_empty_segments_returns_empty() {
-        let (out, _) = compose(vec![], None, &ComposeConfig::default(), None, "", &ContentType::Unknown);
+        let (out, _) = compose(
+            vec![],
+            None,
+            &ComposeConfig::default(),
+            None,
+            "",
+            &ContentType::Unknown,
+        );
         assert_eq!(out, "");
     }
 
@@ -219,8 +249,15 @@ mod tests {
         ];
 
         let dropped_str = "error!\ndropped detail";
-        let (_, hash_opt) = compose(segments, Some(dropped_str.to_string()), &ComposeConfig::default(), Some(&store), "", &ContentType::Unknown);
-        
+        let (_, hash_opt) = compose(
+            segments,
+            Some(dropped_str.to_string()),
+            &ComposeConfig::default(),
+            Some(&store),
+            "",
+            &ContentType::Unknown,
+        );
+
         let hash = hash_opt.unwrap();
         // Retrieve full payload back
         let retrieved = store.retrieve_rewind(&hash).unwrap();

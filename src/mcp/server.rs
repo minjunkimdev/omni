@@ -1,10 +1,10 @@
-use rmcp::handler::server::tool::ToolCallContext;
-use rmcp::{tool, ServerHandler};
-use std::sync::{Arc, Mutex};
-use crate::pipeline::{SessionState, SignalTier};
 use crate::pipeline::classifier::classify;
 use crate::pipeline::scorer::score_segments;
+use crate::pipeline::{SessionState, SignalTier};
 use crate::store::sqlite::Store;
+use rmcp::handler::server::tool::ToolCallContext;
+use rmcp::{ServerHandler, tool};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub struct OmniServer {
@@ -31,12 +31,19 @@ impl OmniServer {
         name = "omni_learn",
         description = "Detect noise patterns in text and suggest TOML filters"
     )]
-    pub async fn omni_learn(&self, #[tool(param)] text: String, #[tool(param)] apply: bool) -> String {
+    pub async fn omni_learn(
+        &self,
+        #[tool(param)] text: String,
+        #[tool(param)] apply: bool,
+    ) -> String {
         let lines: Vec<&str> = text.lines().collect();
         let total = lines.len();
 
         let report = if total > 10 {
-            format!("Detected repeating potential noise patterns bridging {} lines.", total)
+            format!(
+                "Detected repeating potential noise patterns bridging {} lines.",
+                total
+            )
         } else {
             "Not enough structured payload to determine robust native constraints.".to_string()
         };
@@ -44,7 +51,10 @@ impl OmniServer {
         if apply {
             "Successfully appended semantic logic to ~/.omni/filters/learned.toml".to_string()
         } else {
-            format!("{}\nRun omni_learn with apply=true to automatically lock definitions.", report)
+            format!(
+                "{}\nRun omni_learn with apply=true to automatically lock definitions.",
+                report
+            )
         }
     }
 
@@ -123,7 +133,11 @@ impl OmniServer {
             "context" => {
                 let s = self.session.lock().unwrap();
                 let task = s.inferred_task.as_deref().unwrap_or("none");
-                let err = s.active_errors.first().map(|e| e.as_str()).unwrap_or("none");
+                let err = s
+                    .active_errors
+                    .first()
+                    .map(|e| e.as_str())
+                    .unwrap_or("none");
                 format!("[OMNI Context] Task: {}. Error: {}", task, err)
             }
             "clear" => {
@@ -144,7 +158,13 @@ impl ServerHandler for OmniServer {
         &'a self,
         request: rmcp::model::CallToolRequestParam,
         context: rmcp::service::RequestContext<rmcp::RoleServer>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<rmcp::model::CallToolResult, rmcp::Error>> + Send + 'a>> {
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<rmcp::model::CallToolResult, rmcp::Error>>
+                + Send
+                + 'a,
+        >,
+    > {
         Box::pin(async move {
             let tcc = ToolCallContext::new(self, request, context);
             match tcc.name() {
@@ -157,13 +177,19 @@ impl ServerHandler for OmniServer {
             }
         })
     }
-    
+
     // Auto-generates the manifest for MCP clients describing available tools
     fn list_tools<'a>(
         &'a self,
         _request: rmcp::model::PaginatedRequestParam,
         _context: rmcp::service::RequestContext<rmcp::RoleServer>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<rmcp::model::ListToolsResult, rmcp::Error>> + Send + 'a>> {
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<Output = Result<rmcp::model::ListToolsResult, rmcp::Error>>
+                + Send
+                + 'a,
+        >,
+    > {
         Box::pin(async move {
             Ok(rmcp::model::ListToolsResult {
                 tools: vec![
@@ -181,11 +207,11 @@ impl ServerHandler for OmniServer {
 
 pub async fn run(store: Arc<Store>, session: Arc<Mutex<SessionState>>) -> anyhow::Result<()> {
     let server = OmniServer { store, session };
-    
+
     // Setup transport over standard IO seamlessly
     use tokio::io::{stdin, stdout};
     let transport = (stdin(), stdout());
-    
+
     // Serve the server binding transport dynamically via `serve_server`
     let running_service = rmcp::serve_server(server, transport).await?;
     running_service.waiting().await?;
@@ -202,7 +228,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = Arc::new(Store::open_path(&dir.path().join("omni.db")).unwrap());
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let server = OmniServer { store, session };
         let output = server.omni_retrieve("abc".to_string()).await;
         assert_eq!(output, "Not found: abc");
@@ -214,7 +240,7 @@ mod tests {
         let store = Arc::new(Store::open_path(&dir.path().join("omni.db")).unwrap());
         let hash = store.store_rewind("testing_payload");
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let server = OmniServer { store, session };
         let output = server.omni_retrieve(hash).await;
         assert_eq!(output, "testing_payload");
@@ -225,7 +251,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = Arc::new(Store::open_path(&dir.path().join("omni.db")).unwrap());
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let server = OmniServer { store, session };
         let text = "error: something failed\nCompiling deps v1.0".to_string();
         let density = server.omni_density(text).await;
@@ -238,7 +264,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = Arc::new(Store::open_path(&dir.path().join("omni.db")).unwrap());
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let server = OmniServer { store, session };
         let out = server.omni_learn("test loop".to_string(), false).await;
         assert!(out.contains("learn"));
@@ -249,7 +275,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = Arc::new(Store::open_path(&dir.path().join("omni.db")).unwrap());
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let server = OmniServer { store, session };
         let out = server.omni_trust("/invalid".to_string()).await;
         assert!(out.contains("Failed") || out.contains("Trusted"));

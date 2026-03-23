@@ -1,9 +1,9 @@
+use anyhow::Result;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use anyhow::Result;
 
-use crate::pipeline::{classifier, composer, scorer, SessionState};
+use crate::pipeline::{SessionState, classifier, composer, scorer};
 use crate::store::sqlite::Store;
 
 const MAX_PIPE_SIZE: usize = 16 * 1024 * 1024; // 16MB
@@ -13,7 +13,7 @@ pub fn run(store: Option<Arc<Store>>, session: Option<Arc<Mutex<SessionState>>>)
     let stdin = std::io::stdin().lock();
     let stdout = std::io::stdout().lock();
     let stderr = std::io::stderr().lock();
-    
+
     // Testable generic route separating IO
     run_inner(stdin, stdout, stderr, store, session)
 }
@@ -23,7 +23,7 @@ pub fn run_inner<R: Read, W: Write, E: Write>(
     mut output: W,
     mut error: E,
     store: Option<Arc<Store>>,
-    session: Option<Arc<Mutex<SessionState>>>
+    session: Option<Arc<Mutex<SessionState>>>,
 ) -> Result<()> {
     let start_time = Instant::now();
 
@@ -31,16 +31,18 @@ pub fn run_inner<R: Read, W: Write, E: Write>(
     let mut buffer = Vec::new();
     let mut chunk = vec![0; 8192];
     let mut total_read = 0;
-    
+
     loop {
         let n = input.read(&mut chunk)?;
-        if n == 0 { break; }
-        
+        if n == 0 {
+            break;
+        }
+
         total_read += n;
         if total_read > MAX_PIPE_SIZE {
             // Cap buffer up to 16MB for safety LLM limits
             buffer.extend_from_slice(&chunk[..n]);
-            break; 
+            break;
         }
         buffer.extend_from_slice(&chunk[..n]);
     }
@@ -62,18 +64,21 @@ pub fn run_inner<R: Read, W: Write, E: Write>(
     };
 
     if input_text.len() > WARN_PIPE_SIZE {
-        writeln!(error, "[omni: Warning] Input size exceeds 1MB, processing may take longer...")?;
+        writeln!(
+            error,
+            "[omni: Warning] Input size exceeds 1MB, processing may take longer..."
+        )?;
     }
 
     // 4. Run pipeline natively
     let ctype = classifier::classify(&input_text);
-    
+
     let active_session = session.as_ref().map(|s| s.lock().unwrap());
     let scored_segments = scorer::score_segments(&input_text, &ctype, active_session.as_deref());
 
     let compose_config = composer::ComposeConfig::default();
     let decision = composer::decide_rewind(&scored_segments, &ctype);
-    
+
     let final_output = if decision.should_store && store.is_some() {
         composer::compose(
             scored_segments,
@@ -81,8 +86,9 @@ pub fn run_inner<R: Read, W: Write, E: Write>(
             &compose_config,
             store.as_deref(),
             &input_text,
-            &ctype
-        ).0
+            &ctype,
+        )
+        .0
     } else {
         composer::compose(
             scored_segments,
@@ -90,8 +96,9 @@ pub fn run_inner<R: Read, W: Write, E: Write>(
             &compose_config,
             None,
             &input_text,
-            &ctype
-        ).0
+            &ctype,
+        )
+        .0
     };
 
     // 5. If no significant reduction: print original
@@ -125,7 +132,7 @@ mod tests {
         let mut err = Vec::new();
 
         run_inner(input.as_bytes(), &mut out, &mut err, None, None).unwrap();
-        
+
         let out_str = String::from_utf8(out).unwrap();
         // Native Git Diff outputs are normally kept natively, so reduction < original_text.len isn't guaranteed heavily
         // The pipe mode should successfully print it.
@@ -141,15 +148,15 @@ mod tests {
 
         run_inner(input.as_bytes(), &mut out, &mut err, None, None).unwrap();
         let out_str = String::from_utf8(out).unwrap();
-        
+
         // No significant reduction for short inputs
-        assert_eq!(out_str, input); 
+        assert_eq!(out_str, input);
     }
 
     #[test]
     fn test_pipe_mode_exit_0_selalu_as_ok() {
         let binary_input: Vec<u8> = vec![0xFF, 0xFE, 0xFD]; // Invalid UTF-8 Binary Data Checks
-        
+
         let mut out = Vec::new();
         let mut err = Vec::new();
 

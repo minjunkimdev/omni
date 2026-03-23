@@ -2,8 +2,7 @@
 ///
 /// This integration test runs the full pipeline (classify → score → compose) on real
 /// fixture files and asserts each achieves a minimum savings percentage.
-
-use omni::pipeline::{classifier, scorer, composer};
+use omni::pipeline::{classifier, composer, scorer};
 
 fn run_pipeline(input: &str) -> (usize, usize, f64) {
     let ctype = classifier::classify(input);
@@ -25,12 +24,12 @@ fn run_pipeline(input: &str) -> (usize, usize, f64) {
 /// Small fixtures (<500 bytes) may not achieve significant reduction, so we skip threshold
 /// assertion for those and just verify no-crash + valid output.
 const FIXTURES: &[(&str, &str, f64)] = &[
-    ("git",    "tests/fixtures/git_diff_multi_file.txt",    0.0),
-    ("git",    "tests/fixtures/git_status_dirty.txt",       0.0),
-    ("build",  "tests/fixtures/cargo_build_errors.txt",     0.0),
-    ("test",   "tests/fixtures/pytest_failures.txt",        0.0),
-    ("infra",  "tests/fixtures/kubectl_pods_mixed.txt",     0.0),
-    ("infra",  "tests/fixtures/docker_build_layered.txt",   0.0),
+    ("git", "tests/fixtures/git_diff_multi_file.txt", 0.0),
+    ("git", "tests/fixtures/git_status_dirty.txt", 0.0),
+    ("build", "tests/fixtures/cargo_build_errors.txt", 0.0),
+    ("test", "tests/fixtures/pytest_failures.txt", 0.0),
+    ("infra", "tests/fixtures/kubectl_pods_mixed.txt", 0.0),
+    ("infra", "tests/fixtures/docker_build_layered.txt", 0.0),
 ];
 
 #[test]
@@ -44,7 +43,10 @@ fn test_savings_thresholds() {
         assert!(
             output_len <= input_len + 100,
             "{} on {}: output ({}) should not massively exceed input ({})",
-            filter, fixture, output_len, input_len
+            filter,
+            fixture,
+            output_len,
+            input_len
         );
 
         // For files > 500 bytes, check savings threshold
@@ -52,7 +54,12 @@ fn test_savings_thresholds() {
             assert!(
                 actual_pct >= *min_pct,
                 "{} on {}: expected >= {:.0}% savings, got {:.1}% (input={}, output={})",
-                filter, fixture, min_pct, actual_pct, input_len, output_len
+                filter,
+                fixture,
+                min_pct,
+                actual_pct,
+                input_len,
+                output_len
             );
         }
     }
@@ -66,7 +73,9 @@ fn test_all_fixtures_produce_nonempty_output() {
         let path = entry.path();
         if path.extension().map(|e| e == "txt").unwrap_or(false) {
             let input = std::fs::read_to_string(&path).unwrap();
-            if input.is_empty() { continue; }
+            if input.is_empty() {
+                continue;
+            }
             let (_, output_len, _) = run_pipeline(&input);
             // Pipeline should never produce completely empty output from non-empty input
             // (at minimum it passes through or produces a summary)
@@ -88,7 +97,8 @@ fn test_short_input_not_over_expanded() {
     assert!(
         output_len <= input_len + 50,
         "Short input expanded from {} to {} bytes",
-        input_len, output_len
+        input_len,
+        output_len
     );
 }
 

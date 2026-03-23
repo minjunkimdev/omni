@@ -1,5 +1,5 @@
-use crate::pipeline::{ContentType, OutputSegment, SignalTier};
 use crate::distillers::Distiller;
+use crate::pipeline::{ContentType, OutputSegment, SignalTier};
 
 pub struct GitDistiller;
 
@@ -49,8 +49,10 @@ fn distill_status(input: &str) -> String {
             } else {
                 file
             };
-            
-            if clean.is_empty() || clean.starts_with("(use") { continue; }
+
+            if clean.is_empty() || clean.starts_with("(use") {
+                continue;
+            }
 
             match state {
                 "staged" => staged.push(clean),
@@ -61,15 +63,30 @@ fn distill_status(input: &str) -> String {
         }
     }
 
-    let mut out = format!("git: on {} | staged:{} mod:{} untracked:{}", 
-        branch, staged.len(), modified.len(), untracked.len());
+    let mut out = format!(
+        "git: on {} | staged:{} mod:{} untracked:{}",
+        branch,
+        staged.len(),
+        modified.len(),
+        untracked.len()
+    );
 
-    let top_staged = (&staged).iter().take(5).cloned().collect::<Vec<_>>().join(", ");
+    let top_staged = (&staged)
+        .iter()
+        .take(5)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
     if !top_staged.is_empty() {
         out.push_str(&format!("\nStaged: {}", top_staged));
     }
-    
-    let top_mod = (&modified).iter().take(5).cloned().collect::<Vec<_>>().join(", ");
+
+    let top_mod = (&modified)
+        .iter()
+        .take(5)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
     if !top_mod.is_empty() {
         out.push_str(&format!("\nModified: {}", top_mod));
     }
@@ -92,7 +109,9 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
             continue;
         }
 
-        if seg.tier == SignalTier::Noise { continue; }
+        if seg.tier == SignalTier::Noise {
+            continue;
+        }
 
         let mut hunk_out = String::new();
         // Since all hunks contain "@@ -", their tier is Important (0.7).
@@ -112,7 +131,10 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
                 hunk_out.push_str(line);
                 hunk_out.push('\n');
             } else if keep_context {
-                if !line.starts_with("+++") && !line.starts_with("---") && !line.starts_with("index") {
+                if !line.starts_with("+++")
+                    && !line.starts_with("---")
+                    && !line.starts_with("index")
+                {
                     hunk_out.push_str(line);
                     hunk_out.push('\n');
                 }
@@ -120,8 +142,13 @@ fn distill_diff(segments: &[OutputSegment], _input: &str) -> String {
         }
         out.push_str(&hunk_out);
     }
-    
-    let summary = format!("git diff: {} files changed, {}+, {}-", files.len(), added, removed);
+
+    let summary = format!(
+        "git diff: {} files changed, {}+, {}-",
+        files.len(),
+        added,
+        removed
+    );
     format!("{}\n{}", summary, out.trim())
 }
 
@@ -130,11 +157,16 @@ fn distill_log(segments: &[OutputSegment], _input: &str) -> String {
     for seg in segments {
         if seg.tier == SignalTier::Critical || seg.tier == SignalTier::Important {
             for line in seg.content.lines() {
-                if line.starts_with("commit ") || crate::distillers::git::RE_GIT_LOG_HASH.is_match(line) {
+                if line.starts_with("commit ")
+                    || crate::distillers::git::RE_GIT_LOG_HASH.is_match(line)
+                {
                     let hash: String = line.replace("commit ", "").chars().take(7).collect();
                     out.push_str(&hash);
                     out.push(' ');
-                } else if !line.starts_with("Author:") && !line.starts_with("Date:") && !line.trim().is_empty() {
+                } else if !line.starts_with("Author:")
+                    && !line.starts_with("Date:")
+                    && !line.trim().is_empty()
+                {
                     out.push_str(line.trim());
                     out.push('\n');
                 }

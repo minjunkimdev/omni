@@ -1,6 +1,6 @@
-use crate::store::sqlite::Store;
 use crate::pipeline::SessionState;
-use chrono::{Utc, TimeZone, Local};
+use crate::store::sqlite::Store;
+use chrono::{Local, TimeZone, Utc};
 use std::sync::Arc;
 
 pub fn run_session(args: &[String], store: Arc<Store>) -> anyhow::Result<()> {
@@ -28,9 +28,19 @@ pub fn run_session(args: &[String], store: Arc<Store>) -> anyhow::Result<()> {
         println!("Recent Sessions:");
         for s in sessions {
             let ago = (Utc::now().timestamp() - s.last_active) / 60;
-            let time_str = if ago < 60 { format!("{}m ago", ago) } else { format!("{}h ago", ago / 60) };
+            let time_str = if ago < 60 {
+                format!("{}m ago", ago)
+            } else {
+                format!("{}h ago", ago / 60)
+            };
             let task = s.inferred_task.as_deref().unwrap_or("not detected");
-            println!("- {} ({}) | Task: {} | Commands: {}", s.session_id, time_str, task, s.last_commands.len());
+            println!(
+                "- {} ({}) | Task: {} | Commands: {}",
+                s.session_id,
+                time_str,
+                task,
+                s.last_commands.len()
+            );
         }
         return Ok(());
     }
@@ -61,21 +71,34 @@ pub fn run_session(args: &[String], store: Arc<Store>) -> anyhow::Result<()> {
     }
 
     if is_inject {
-        let task = state.inferred_task.as_deref().unwrap_or("general development");
+        let task = state
+            .inferred_task
+            .as_deref()
+            .unwrap_or("general development");
         let mut hot_vec: Vec<(&String, &u32)> = state.hot_files.iter().collect();
         hot_vec.sort_by(|a, b| b.1.cmp(a.1));
-        
+
         let hot_str = if hot_vec.is_empty() {
             "none".to_string()
         } else {
-            hot_vec.iter().take(2).map(|(k, v)| format!("{} ({}x)", k, v)).collect::<Vec<_>>().join(", ")
+            hot_vec
+                .iter()
+                .take(2)
+                .map(|(k, v)| format!("{} ({}x)", k, v))
+                .collect::<Vec<_>>()
+                .join(", ")
         };
-        
-        let err_str = state.active_errors.first()
+
+        let err_str = state
+            .active_errors
+            .first()
             .map(|s| s.replace('\n', " ").chars().take(80).collect::<String>())
             .unwrap_or_else(|| "none".to_string());
-        
-        let mut msg = format!("[OMNI Context] Task: {}. Hot: {}. Error: {}", task, hot_str, err_str);
+
+        let mut msg = format!(
+            "[OMNI Context] Task: {}. Hot: {}. Error: {}",
+            task, hot_str, err_str
+        );
         if msg.len() > 200 {
             msg.truncate(197);
             msg.push_str("...");
@@ -86,10 +109,15 @@ pub fn run_session(args: &[String], store: Arc<Store>) -> anyhow::Result<()> {
 
     // Default output
     let ago = (Utc::now().timestamp() - state.started_at) / 60;
-    let time_str = if ago < 60 { format!("{}m ago", ago) } else { format!("{}h ago", ago / 60) };
-    
+    let time_str = if ago < 60 {
+        format!("{}m ago", ago)
+    } else {
+        format!("{}h ago", ago / 60)
+    };
+
     // Formatting started_at local time safely
-    let started_str = Local.timestamp_opt(state.started_at, 0)
+    let started_str = Local
+        .timestamp_opt(state.started_at, 0)
         .single()
         .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
         .unwrap_or_else(|| "unknown time".to_string());
@@ -97,23 +125,33 @@ pub fn run_session(args: &[String], store: Arc<Store>) -> anyhow::Result<()> {
     println!("─────────────────────────────────────────");
     println!(" OMNI — Current Session");
     println!("─────────────────────────────────────────");
-    
-    let sid = if state.session_id.len() > 8 { &state.session_id[..8] } else { &state.session_id };
+
+    let sid = if state.session_id.len() > 8 {
+        &state.session_id[..8]
+    } else {
+        &state.session_id
+    };
     println!(" Session:   {}", sid);
     println!(" Started:   {} ({})", time_str, started_str);
     println!(" Commands:  {}", state.last_commands.len());
     println!();
-    println!(" Inferred task:   {}", state.inferred_task.as_deref().unwrap_or("not detected"));
-    println!(" Inferred domain: {}", state.inferred_domain.as_deref().unwrap_or("not detected"));
+    println!(
+        " Inferred task:   {}",
+        state.inferred_task.as_deref().unwrap_or("not detected")
+    );
+    println!(
+        " Inferred domain: {}",
+        state.inferred_domain.as_deref().unwrap_or("not detected")
+    );
     println!();
-    
+
     let mut hot_vec: Vec<(&String, &u32)> = state.hot_files.iter().collect();
     hot_vec.sort_by(|a, b| b.1.cmp(a.1));
     println!(" Hot files ({} total):", state.hot_files.len());
     for (i, (file, count)) in hot_vec.iter().take(3).enumerate() {
         println!("  {}. {}      ({} accesses)", i + 1, file, count);
     }
-    
+
     println!();
     println!(" Active errors:");
     if state.active_errors.is_empty() {
@@ -121,15 +159,22 @@ pub fn run_session(args: &[String], store: Arc<Store>) -> anyhow::Result<()> {
     } else {
         for err in state.active_errors.iter().take(3) {
             let e = err.replace('\n', " ");
-            let clean = if e.len() > 80 { format!("{}...", &e[..77]) } else { e };
+            let clean = if e.len() > 80 {
+                format!("{}...", &e[..77])
+            } else {
+                e
+            };
             println!("  • {}", clean);
         }
     }
     println!();
-    
+
     let domain = state.inferred_domain.as_deref().unwrap_or("unknown");
     if domain != "unknown" {
-        println!(" Context score: session context is boosting signals in {}/*", domain);
+        println!(
+            " Context score: session context is boosting signals in {}/*",
+            domain
+        );
     } else {
         println!(" Context score: baseline session context mapping");
     }
@@ -174,7 +219,7 @@ mod tests {
         let (store, _dir) = get_store();
         let state = SessionState::new();
         store.upsert_session(&state);
-        
+
         assert!(store.find_latest_session().is_some());
 
         let args = vec!["session".to_string(), "--clear".to_string()];

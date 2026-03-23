@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -170,14 +170,8 @@ pub fn install_omni_hooks(val: &mut Value, exe_path: &str) {
         hooks.entry("PostToolUse").or_insert_with(|| json!([])),
         "Bash",
     );
-    ensure_hook(
-        hooks.entry("SessionStart").or_insert_with(|| json!([])),
-        "",
-    );
-    ensure_hook(
-        hooks.entry("PreCompact").or_insert_with(|| json!([])),
-        "",
-    );
+    ensure_hook(hooks.entry("SessionStart").or_insert_with(|| json!([])), "");
+    ensure_hook(hooks.entry("PreCompact").or_insert_with(|| json!([])), "");
 }
 
 pub fn remove_omni_hooks(val: &mut Value) {
@@ -188,8 +182,7 @@ pub fn remove_omni_hooks(val: &mut Value) {
                     arr.retain(|v| {
                         if let Some(inner) = v.get("hooks").and_then(|h| h.as_array()) {
                             !inner.iter().any(|h| {
-                                h
-                                    .get("command")
+                                h.get("command")
                                     .and_then(|c| c.as_str())
                                     .map_or(false, |c| c.contains("omni") && c.contains("--hook"))
                             })
@@ -225,12 +218,16 @@ mod tests {
 
         let get_count = |v: &Value| -> usize {
             v.get("hooks")
-             .unwrap().get("PostToolUse")
-             .unwrap().as_array().unwrap().len()
+                .unwrap()
+                .get("PostToolUse")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len()
         };
 
         assert_eq!(get_count(&val), 1);
-        
+
         install_omni_hooks(&mut val, "/usr/bin/omni");
         assert_eq!(get_count(&val), 1, "Should be idempotent");
     }
@@ -242,11 +239,11 @@ mod tests {
         let mut val = json!({});
         let exe = "/usr/bin/omni";
         install_omni_hooks(&mut val, exe);
-        
+
         // Check status with correct path
         let (post, sess, pre) = check_status(&val, exe);
         assert!(post && sess && pre);
-        
+
         // Check status with incorrect path
         let (post_f, sess_f, pre_f) = check_status(&val, "/different/omni");
         assert!(!post_f && !sess_f && !pre_f);
@@ -257,14 +254,24 @@ mod tests {
         let mut val = json!({});
         let exe = "/usr/bin/omni";
         install_omni_hooks(&mut val, exe);
-        
+
         assert!(check_status(&val, exe).0); // terpasang
 
         remove_omni_hooks(&mut val);
-        
+
         assert!(!check_status(&val, exe).0); // hilang
-        
-        let arr = val.get("hooks").unwrap().get("PostToolUse").unwrap().as_array().unwrap();
-        assert_eq!(arr.len(), 0, "Array must be empty after retain cleans it out");
+
+        let arr = val
+            .get("hooks")
+            .unwrap()
+            .get("PostToolUse")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(
+            arr.len(),
+            0,
+            "Array must be empty after retain cleans it out"
+        );
     }
 }

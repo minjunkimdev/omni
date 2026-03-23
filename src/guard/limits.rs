@@ -1,5 +1,5 @@
-pub const MAX_INPUT: usize = 16 * 1024 * 1024;  // 16MB
-pub const WARN_INPUT: usize = 1 * 1024 * 1024;  // 1MB
+pub const MAX_INPUT: usize = 16 * 1024 * 1024; // 16MB
+pub const WARN_INPUT: usize = 1 * 1024 * 1024; // 1MB
 
 pub enum InputCheck {
     Ok,
@@ -25,7 +25,10 @@ mod tests {
     #[test]
     fn test_check_input_ok_for_normal_input() {
         assert!(matches!(check_input("normal text"), InputCheck::Ok));
-        assert!(matches!(check_input(&"a".repeat(1024 * 1024)), InputCheck::Ok)); // 1MB is Ok, just a warning in logs typically
+        assert!(matches!(
+            check_input(&"a".repeat(1024 * 1024)),
+            InputCheck::Ok
+        )); // 1MB is Ok, just a warning in logs typically
     }
 
     #[test]

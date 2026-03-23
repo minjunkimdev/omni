@@ -1,6 +1,5 @@
 /// Security tests — verify OMNI does not introduce attack vectors.
-
-use omni::pipeline::{classifier, scorer, composer};
+use omni::pipeline::{classifier, composer, scorer};
 
 fn run_pipeline(input: &str) -> String {
     let ctype = classifier::classify(input);
@@ -13,10 +12,12 @@ fn run_pipeline(input: &str) -> String {
 #[test]
 fn test_env_sanitization_denylist() {
     use omni::guard::env::{DENYLIST, sanitize_env};
-    
+
     // Set some dangerous env vars (unsafe in Rust 2024)
     for var in DENYLIST.iter().take(3) {
-        unsafe { std::env::set_var(var, "INJECTED_VALUE"); }
+        unsafe {
+            std::env::set_var(var, "INJECTED_VALUE");
+        }
     }
 
     let sanitized = sanitize_env();
@@ -32,7 +33,9 @@ fn test_env_sanitization_denylist() {
 
     // Cleanup
     for var in DENYLIST.iter().take(3) {
-        unsafe { std::env::remove_var(var); }
+        unsafe {
+            std::env::remove_var(var);
+        }
     }
 }
 
@@ -98,11 +101,14 @@ fn test_pipeline_handles_unicode_edge_cases() {
 
 #[test]
 fn test_pipeline_deterministic() {
-    let input = std::fs::read_to_string("tests/fixtures/git_diff_multi_file.txt")
-        .expect("fixture missing");
-    
+    let input =
+        std::fs::read_to_string("tests/fixtures/git_diff_multi_file.txt").expect("fixture missing");
+
     let output1 = run_pipeline(&input);
     let output2 = run_pipeline(&input);
-    
-    assert_eq!(output1, output2, "Pipeline should be deterministic for same input");
+
+    assert_eq!(
+        output1, output2,
+        "Pipeline should be deterministic for same input"
+    );
 }

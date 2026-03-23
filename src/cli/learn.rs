@@ -1,8 +1,8 @@
+use crate::session::learn::{apply_to_config, detect_patterns, generate_toml};
 use anyhow::Result;
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use crate::session::learn::{detect_patterns, generate_toml, apply_to_config};
 
 pub fn run_learn(args: &[String]) -> Result<()> {
     let apply = args.iter().any(|a| a == "--apply");
@@ -12,7 +12,9 @@ pub fn run_learn(args: &[String]) -> Result<()> {
 
     if verify {
         println!("Running inline tests for all loaded TOML filters...");
-        let report = crate::pipeline::toml_filter::run_inline_tests(&crate::pipeline::toml_filter::load_all_filters());
+        let report = crate::pipeline::toml_filter::run_inline_tests(
+            &crate::pipeline::toml_filter::load_all_filters(),
+        );
         let total = report.passes + report.failures.len();
         println!("Filters passed: {}/{}", report.passes, total);
         if !report.failures.is_empty() {
@@ -25,9 +27,11 @@ pub fn run_learn(args: &[String]) -> Result<()> {
     }
 
     let mut input = String::new();
-    
+
     if from_queue {
-        let dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".omni");
+        let dir = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".omni");
         let path = dir.join("learn_queue.jsonl");
         if path.exists() {
             let content = fs::read_to_string(&path)?;
@@ -56,19 +60,35 @@ pub fn run_learn(args: &[String]) -> Result<()> {
 
     println!("Identified {} candidate patterns:\n", candidates.len());
     for (i, c) in candidates.iter().enumerate() {
-        println!("{}. [{}] \"{}\" ({} occurences)", i+1, format!("{:?}", c.suggested_action).to_lowercase(), c.trigger_prefix, c.count);
+        println!(
+            "{}. [{}] \"{}\" ({} occurences)",
+            i + 1,
+            format!("{:?}", c.suggested_action).to_lowercase(),
+            c.trigger_prefix,
+            c.count
+        );
     }
-    
+
     let generated = generate_toml(&candidates, "auto_learned");
-    
+
     if dry_run {
         println!("\n[Dry Run] Generated TOML configuration:\n{}", generated);
     } else if apply {
-        let path = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".omni").join("filters").join("learned.toml");
+        let path = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".omni")
+            .join("filters")
+            .join("learned.toml");
         apply_to_config(&candidates, "auto_learned", &path)?;
-        println!("\nSuccessfully appended {} triggers to {:?}", candidates.len(), path);
+        println!(
+            "\nSuccessfully appended {} triggers to {:?}",
+            candidates.len(),
+            path
+        );
     } else {
-        println!("\nRun `omni learn --apply` to automatically write these into your ~/.omni filters.");
+        println!(
+            "\nRun `omni learn --apply` to automatically write these into your ~/.omni filters."
+        );
         println!("Or `omni learn --dry-run` to preview the generated TOML.");
     }
 

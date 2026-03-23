@@ -1,7 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion, black_box};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use std::time::Duration;
 
-use omni::pipeline::{classifier, scorer, composer, ContentType};
+use omni::pipeline::{ContentType, classifier, composer, scorer};
 
 // ─── Fixtures ───────────────────────────────────────────
 

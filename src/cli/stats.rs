@@ -1,13 +1,18 @@
-use anyhow::Result;
 use crate::store::sqlite::Store;
+use anyhow::Result;
 
 // ─── Helper Functions ───────────────────────────────────
 
 pub fn format_bytes(n: u64) -> String {
-    if n < 1024 { format!("{} B", n) }
-    else if n < 1024 * 1024 { format!("{:.1} KB", n as f64 / 1024.0) }
-    else if n < 1024 * 1024 * 1024 { format!("{:.1} MB", n as f64 / (1024.0 * 1024.0)) }
-    else { format!("{:.1} GB", n as f64 / (1024.0 * 1024.0 * 1024.0)) }
+    if n < 1024 {
+        format!("{} B", n)
+    } else if n < 1024 * 1024 {
+        format!("{:.1} KB", n as f64 / 1024.0)
+    } else if n < 1024 * 1024 * 1024 {
+        format!("{:.1} MB", n as f64 / (1024.0 * 1024.0))
+    } else {
+        format!("{:.1} GB", n as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
 }
 
 pub fn format_bar(pct: f64) -> String {
@@ -27,7 +32,9 @@ fn format_number(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::new();
     for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 { result.push(','); }
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
         result.push(c);
     }
     result.chars().rev().collect()
@@ -51,11 +58,18 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
     };
 
     // Aggregate
-    let (count, input_total, output_total, sum_latency, _max_latency) = store.aggregate_stats(since)?;
+    let (count, input_total, output_total, sum_latency, _max_latency) =
+        store.aggregate_stats(since)?;
     let reduction_pct = if input_total > 0 {
         100.0 * (1.0 - output_total as f64 / input_total as f64)
-    } else { 0.0 };
-    let avg_latency = if count > 0 { sum_latency as f64 / count as f64 } else { 0.0 };
+    } else {
+        0.0
+    };
+    let avg_latency = if count > 0 {
+        sum_latency as f64 / count as f64
+    } else {
+        0.0
+    };
     let bytes_saved = input_total.saturating_sub(output_total);
     let cost_saved = est_cost_usd(bytes_saved);
 
@@ -71,7 +85,10 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
     println!(" Signal ratio:       {:.1}% reduction", reduction_pct);
     println!(" Est. cost saved:    ${:.3} (@$3/1M tokens)", cost_saved);
     println!(" Avg latency:        {:.1}ms", avg_latency);
-    println!(" RewindStore:        {} items stored, {} retrieved", rewind_stored, rewind_retrieved);
+    println!(
+        " RewindStore:        {} items stored, {} retrieved",
+        rewind_stored, rewind_retrieved
+    );
 
     // Filter breakdown
     let filters = store.filter_breakdown(since)?;
@@ -81,8 +98,18 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
             let bar = format_bar(*pct);
             let suffix = if name == "passthrough" || name == "unknown" {
                 "  ← run: omni learn"
-            } else { "" };
-            println!("  {}. {:<14} {:>4}x  {:>3.0}%  {}{}", i+1, name, cnt, pct, bar, suffix);
+            } else {
+                ""
+            };
+            println!(
+                "  {}. {:<14} {:>4}x  {:>3.0}%  {}{}",
+                i + 1,
+                name,
+                cnt,
+                pct,
+                bar,
+                suffix
+            );
         }
     }
 
@@ -92,7 +119,11 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
         let total_routes: u64 = routes.iter().map(|(_, c)| c).sum();
         println!("\n Routes:");
         for (route, cnt) in &routes {
-            let pct = if total_routes > 0 { *cnt as f64 / total_routes as f64 * 100.0 } else { 0.0 };
+            let pct = if total_routes > 0 {
+                *cnt as f64 / total_routes as f64 * 100.0
+            } else {
+                0.0
+            };
             println!("  {:<15} {:>5}  ({:.0}%)", format!("{}:", route), cnt, pct);
         }
     }
@@ -103,11 +134,17 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
         if !hot_files.is_empty() || rewind_retrieved > 0 {
             println!("\n Session insights:");
             if !hot_files.is_empty() {
-                let files_str: Vec<String> = hot_files.iter().map(|(f, c)| format!("{} ({}x)", f, c)).collect();
+                let files_str: Vec<String> = hot_files
+                    .iter()
+                    .map(|(f, c)| format!("{} ({}x)", f, c))
+                    .collect();
                 println!("  Hot files:      {}", files_str.join(", "));
             }
             if rewind_retrieved > 0 {
-                println!("  Accuracy signals: {} RewindStore retrievals (OMNI terlalu agresif?)", rewind_retrieved);
+                println!(
+                    "  Accuracy signals: {} RewindStore retrievals (OMNI terlalu agresif?)",
+                    rewind_retrieved
+                );
             }
         }
     }
@@ -121,7 +158,13 @@ pub fn run(args: &[String], store: &Store) -> Result<()> {
             println!("\n  Commands without filter:");
             for (i, (cmd, cnt)) in candidates.iter().enumerate() {
                 let short = if cmd.len() > 30 { &cmd[..30] } else { cmd };
-                println!("   {}. {} ({}x)  → run: omni learn < {}.log", i+1, short, cnt, short.split_whitespace().next().unwrap_or("cmd"));
+                println!(
+                    "   {}. {} ({}x)  → run: omni learn < {}.log",
+                    i + 1,
+                    short,
+                    cnt,
+                    short.split_whitespace().next().unwrap_or("cmd")
+                );
             }
         }
     }

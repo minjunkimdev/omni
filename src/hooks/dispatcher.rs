@@ -15,7 +15,11 @@ pub fn run(store: Arc<Store>, session: Arc<Mutex<SessionState>>) -> anyhow::Resu
     match std::panic::catch_unwind(|| {
         let stdin = io::stdin();
         let mut input_str = String::new();
-        if stdin.take(16 * 1024 * 1024).read_to_string(&mut input_str).is_err() {
+        if stdin
+            .take(16 * 1024 * 1024)
+            .read_to_string(&mut input_str)
+            .is_err()
+        {
             return Ok(());
         }
 
@@ -74,12 +78,12 @@ mod tests {
     fn test_dispatcher_routes_post_tool_use_ke_correct_handler() {
         let (store, _dir) = get_store();
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         // Buat input PostToolUse valid
         let diff_str = "diff --git a/test.txt b/test.txt\n--- a/test.txt\n+++ b/test.txt\n@@ -1,1 +1,2 @@\n-old\n+new line 1\n".to_string();
         let mut big_diff = diff_str.clone();
         for _ in 0..50 {
-           big_diff.push_str(" \n");
+            big_diff.push_str(" \n");
         }
 
         let input = json!({
@@ -87,7 +91,7 @@ mod tests {
             "tool_input": { "command": "git diff" },
             "tool_response": { "content": big_diff }
         });
-        
+
         let out = process_payload(&input.to_string(), store, session);
         assert!(out.is_some());
         assert!(out.unwrap().contains("PostToolUse"));
@@ -101,7 +105,7 @@ mod tests {
         store.upsert_session(&state);
 
         let session = Arc::new(Mutex::new(SessionState::new())); // dipatcher state doesn't matter much for SessionStart
-        
+
         let input = json!({
             "hookEventName": "SessionStart",
             "sessionId": "456",
@@ -113,16 +117,19 @@ mod tests {
             std::env::set_var("OMNI_FRESH", "0");
         }
         let out = process_payload(&input.to_string(), store, session);
-        
+
         assert!(out.is_some());
-        assert!(out.unwrap().contains("SessionStart"), "Dispatched output must be SessionStart");
+        assert!(
+            out.unwrap().contains("SessionStart"),
+            "Dispatched output must be SessionStart"
+        );
     }
 
     #[test]
     fn test_dispatcher_routes_pre_compact_ke_correct_handler() {
         let (store, _dir) = get_store();
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let input = json!({
             "hookEventName": "PreCompact",
             "sessionId": "123",

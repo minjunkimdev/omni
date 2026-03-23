@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -55,12 +55,12 @@ impl Store {
         }
 
         let conn = Connection::open(path).context("Failed to open SQLite database")?;
-        
+
         // Optimizations
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             PRAGMA foreign_keys = ON;"
+             PRAGMA foreign_keys = ON;",
         )?;
 
         let store = Self {
@@ -73,22 +73,42 @@ impl Store {
 
     pub fn stats(&self) -> Result<(usize, usize)> {
         let conn = self.conn.lock().unwrap();
-        let sessions: usize = conn.query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0)).unwrap_or(0);
-        let rewinds: usize = conn.query_row("SELECT COUNT(*) FROM rewind_store", [], |row| row.get(0)).unwrap_or(0);
+        let sessions: usize = conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap_or(0);
+        let rewinds: usize = conn
+            .query_row("SELECT COUNT(*) FROM rewind_store", [], |row| row.get(0))
+            .unwrap_or(0);
         Ok((sessions, rewinds))
     }
 
     pub fn latest_activity_timestamps(&self) -> Result<(Option<u64>, Option<u64>)> {
         let conn = self.conn.lock().unwrap();
-        let s_ts: Option<i64> = conn.query_row("SELECT last_active FROM sessions ORDER BY last_active DESC LIMIT 1", [], |row| row.get(0)).ok().flatten();
-        let r_ts: Option<i64> = conn.query_row("SELECT ts FROM rewind_store ORDER BY ts DESC LIMIT 1", [], |row| row.get(0)).ok().flatten();
+        let s_ts: Option<i64> = conn
+            .query_row(
+                "SELECT last_active FROM sessions ORDER BY last_active DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .ok()
+            .flatten();
+        let r_ts: Option<i64> = conn
+            .query_row(
+                "SELECT ts FROM rewind_store ORDER BY ts DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .ok()
+            .flatten();
         Ok((s_ts.map(|v| v as u64), r_ts.map(|v| v as u64)))
     }
 
     pub fn check_fts5(&self) -> bool {
         let conn = self.conn.lock().unwrap();
-        let query = "SELECT 1 FROM pragma_compile_options WHERE compile_options LIKE 'ENABLE_FTS5%'";
-        conn.query_row(query, [], |row| row.get::<_, i64>(0)).is_ok()
+        let query =
+            "SELECT 1 FROM pragma_compile_options WHERE compile_options LIKE 'ENABLE_FTS5%'";
+        conn.query_row(query, [], |row| row.get::<_, i64>(0))
+            .is_ok()
     }
 
     /// Aggregate distillation stats since a given timestamp
@@ -112,9 +132,16 @@ impl Store {
                          ELSE ROUND(100.0*(1.0 - CAST(SUM(output_bytes) AS REAL)/SUM(input_bytes)),1) END
              FROM distillations WHERE ts >= ?1 GROUP BY filter_name ORDER BY COUNT(*) DESC"
         )?;
-        let rows = stmt.query_map(params![since], |row| {
-            Ok((row.get::<_,String>(0)?, row.get::<_,u64>(1)?, row.get::<_,f64>(2)?))
-        })?.filter_map(|r| r.ok()).collect();
+        let rows = stmt
+            .query_map(params![since], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, f64>(2)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     }
 
@@ -124,17 +151,28 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT route, COUNT(*) FROM distillations WHERE ts >= ?1 GROUP BY route ORDER BY COUNT(*) DESC"
         )?;
-        let rows = stmt.query_map(params![since], |row| {
-            Ok((row.get::<_,String>(0)?, row.get::<_,u64>(1)?))
-        })?.filter_map(|r| r.ok()).collect();
+        let rows = stmt
+            .query_map(params![since], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     }
 
     /// RewindStore metrics: (total_stored, total_retrieved)
     pub fn rewind_metrics(&self) -> Result<(u64, u64)> {
         let conn = self.conn.lock().unwrap();
-        let total: u64 = conn.query_row("SELECT COUNT(*) FROM rewind_store", [], |row| row.get(0)).unwrap_or(0);
-        let retrieved: u64 = conn.query_row("SELECT COUNT(*) FROM rewind_store WHERE retrieved > 0", [], |row| row.get(0)).unwrap_or(0);
+        let total: u64 = conn
+            .query_row("SELECT COUNT(*) FROM rewind_store", [], |row| row.get(0))
+            .unwrap_or(0);
+        let retrieved: u64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM rewind_store WHERE retrieved > 0",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
         Ok((total, retrieved))
     }
 
@@ -144,9 +182,12 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT command, COUNT(*) as cnt FROM distillations WHERE ts >= ?1 AND route = 'Passthrough' AND command != '' GROUP BY command ORDER BY cnt DESC LIMIT 10"
         )?;
-        let rows = stmt.query_map(params![since], |row| {
-            Ok((row.get::<_,String>(0)?, row.get::<_,u64>(1)?))
-        })?.filter_map(|r| r.ok()).collect();
+        let rows = stmt
+            .query_map(params![since], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     }
 
@@ -156,12 +197,15 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT file_path, SUM(access_count) as cnt FROM file_access WHERE last_access >= ?1 GROUP BY file_path ORDER BY cnt DESC LIMIT 5"
         )?;
-        let rows = stmt.query_map(params![since], |row| {
-            Ok((row.get::<_,String>(0)?, row.get::<_,u64>(1)?))
-        })?.filter_map(|r| r.ok()).collect();
+        let rows = stmt
+            .query_map(params![since], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     }
-    
+
     fn init_schema(&self) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute_batch(
@@ -313,12 +357,13 @@ impl Store {
 
     pub fn list_recent_sessions(&self, limit: usize) -> Result<Vec<SessionState>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT state_json FROM sessions ORDER BY last_active DESC LIMIT ?1")?;
+        let mut stmt =
+            conn.prepare("SELECT state_json FROM sessions ORDER BY last_active DESC LIMIT ?1")?;
         let rows = stmt.query_map(params![limit as i64], |row| {
             let json_str: String = row.get(0)?;
             Ok(json_str)
         })?;
-        
+
         let mut out = Vec::new();
         for r in rows {
             if let Ok(j) = r {
@@ -408,7 +453,12 @@ impl Store {
         );
     }
 
-    pub fn search_session_events(&self, session_id: &str, query: &str, limit: usize) -> Vec<String> {
+    pub fn search_session_events(
+        &self,
+        session_id: &str,
+        query: &str,
+        limit: usize,
+    ) -> Vec<String> {
         let conn = match self.conn.lock() {
             Ok(c) => c,
             Err(_) => return vec![],
@@ -417,7 +467,7 @@ impl Store {
         let mut stmt = match conn.prepare(
             "SELECT content FROM session_events 
              WHERE session_id = ?1 AND session_events MATCH ?2 
-             ORDER BY rank LIMIT ?3"
+             ORDER BY rank LIMIT ?3",
         ) {
             Ok(s) => s,
             Err(_) => return vec![],
@@ -474,13 +524,12 @@ impl Store {
         }
 
         let mut by_route = Vec::new();
-        let mut stmt = conn.prepare(
-            "SELECT route, COUNT(*) FROM distillations WHERE ts >= ?1 GROUP BY route"
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT route, COUNT(*) FROM distillations WHERE ts >= ?1 GROUP BY route")?;
         let rows = stmt.query_map(params![ts_threshold], |row| {
             Ok(RouteStats {
                 route: row.get(0)?,
-                count: row.get(1)?
+                count: row.get(1)?,
             })
         })?;
         for row in rows {
@@ -493,11 +542,9 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT command, COUNT(*) as c FROM distillations 
              WHERE ts >= ?1 AND route = 'Passthrough' AND command != '' 
-             GROUP BY command ORDER BY c DESC LIMIT 10"
+             GROUP BY command ORDER BY c DESC LIMIT 10",
         )?;
-        let rows = stmt.query_map(params![ts_threshold], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+        let rows = stmt.query_map(params![ts_threshold], |row| Ok((row.get(0)?, row.get(1)?)))?;
         for row in rows {
             if let Ok(stats) = row {
                 passthrough_commands.push(stats);
@@ -523,19 +570,34 @@ impl Store {
 
         let ts_threshold = chrono::Utc::now().timestamp() - (days as i64 * 86400);
 
-        let _ = conn.execute("DELETE FROM sessions WHERE started_at < ?1", params![ts_threshold]);
-        let _ = conn.execute("DELETE FROM distillations WHERE ts < ?1", params![ts_threshold]);
-        let _ = conn.execute("DELETE FROM file_access WHERE last_access < ?1", params![ts_threshold]);
-        let _ = conn.execute("DELETE FROM rewind_store WHERE ts < ?1", params![ts_threshold]);
-        let _ = conn.execute("DELETE FROM session_events WHERE ts < ?1", params![ts_threshold]);
+        let _ = conn.execute(
+            "DELETE FROM sessions WHERE started_at < ?1",
+            params![ts_threshold],
+        );
+        let _ = conn.execute(
+            "DELETE FROM distillations WHERE ts < ?1",
+            params![ts_threshold],
+        );
+        let _ = conn.execute(
+            "DELETE FROM file_access WHERE last_access < ?1",
+            params![ts_threshold],
+        );
+        let _ = conn.execute(
+            "DELETE FROM rewind_store WHERE ts < ?1",
+            params![ts_threshold],
+        );
+        let _ = conn.execute(
+            "DELETE FROM session_events WHERE ts < ?1",
+            params![ts_threshold],
+        );
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use crate::pipeline::ContentType;
+    use tempfile::tempdir;
 
     fn get_temp_store() -> (Store, tempfile::TempDir) {
         let dir = tempdir().unwrap();
@@ -548,11 +610,17 @@ mod tests {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("omni.db");
         let store = Store::open_path(&db_path).unwrap();
-        
+
         let conn = store.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table'").unwrap();
-        let tables: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().map(|r| r.unwrap()).collect();
-        
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+            .unwrap();
+        let tables: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+
         assert!(tables.contains(&"sessions".to_string()));
         assert!(tables.contains(&"distillations".to_string()));
         assert!(tables.contains(&"file_access".to_string()));
@@ -586,15 +654,21 @@ mod tests {
         let (store, _dir) = get_temp_store();
         let content = "this is some compressed content";
         let hash = store.store_rewind(content);
-        
+
         assert_eq!(hash.len(), 8);
-        
+
         let retrieved = store.retrieve_rewind(&hash);
         assert_eq!(retrieved, Some(content.to_string()));
-        
+
         // Retrieved counts updated
         let conn = store.conn.lock().unwrap();
-        let count: i32 = conn.query_row("SELECT retrieved FROM rewind_store WHERE hash = ?1", params![hash], |row| row.get(0)).unwrap();
+        let count: i32 = conn
+            .query_row(
+                "SELECT retrieved FROM rewind_store WHERE hash = ?1",
+                params![hash],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -604,7 +678,7 @@ mod tests {
         let content = "duplicate me";
         let hash1 = store.store_rewind(content);
         let hash2 = store.store_rewind(content); // duplicate
-        
+
         assert_eq!(hash1, hash2);
     }
 
@@ -614,7 +688,7 @@ mod tests {
         store.index_event("sess_1", "command", "git status is running fast");
         store.index_event("sess_1", "command", "npm install");
         store.index_event("sess_2", "command", "git status is running"); // diff session
-        
+
         let res = store.search_session_events("sess_1", "running", 10);
         assert_eq!(res.len(), 1);
         assert_eq!(res[0], "git status is running fast");
@@ -624,7 +698,7 @@ mod tests {
     fn test_fts5_porter_stemming_running_matches_run() {
         let (store, _dir) = get_temp_store();
         store.index_event("sess_2", "log", "The server is running now");
-        
+
         // Porter stemming makes 'run' match 'running'
         let res = store.search_session_events("sess_2", "run", 10);
         assert_eq!(res.len(), 1);
@@ -635,15 +709,17 @@ mod tests {
     fn test_cleanup_old_menghapus_entries_lama() {
         let (store, _dir) = get_temp_store();
         let old_ts = chrono::Utc::now().timestamp() - (5 * 86400); // 5 days ago
-        
+
         let conn = store.conn.lock().unwrap();
         conn.execute("INSERT INTO distillations (session_id, ts, filter_name, content_type, input_bytes, output_bytes, route, latency_ms) VALUES ('sess_1', ?1, 'f', 't', 1, 1, 'K', 1)", [old_ts]).unwrap();
         drop(conn);
-        
+
         store.cleanup_old(2); // keep last 2 days
-        
+
         let conn = store.conn.lock().unwrap();
-        let count: i32 = conn.query_row("SELECT COUNT(*) FROM distillations", [], |row| row.get(0)).unwrap();
+        let count: i32 = conn
+            .query_row("SELECT COUNT(*) FROM distillations", [], |row| row.get(0))
+            .unwrap();
         assert_eq!(count, 0);
     }
 
@@ -652,9 +728,9 @@ mod tests {
         let (store, _dir) = get_temp_store();
         let mut state = SessionState::new();
         state.inferred_task = Some("fixing bugs".to_string());
-        
+
         store.upsert_session(&state);
-        
+
         let loaded = store.load_session(&state.session_id).unwrap();
         assert_eq!(loaded.inferred_task, Some("fixing bugs".to_string()));
     }
@@ -662,7 +738,7 @@ mod tests {
     #[test]
     fn test_get_summary_kalkulasi_benar() {
         let (store, _dir) = get_temp_store();
-        
+
         let mut state = SessionState::new();
         state.session_id = "sess_1".to_string();
         store.upsert_session(&state);
@@ -704,7 +780,7 @@ mod tests {
         assert_eq!(summary.total_distillations, 2);
         assert_eq!(summary.total_input_bytes, 300);
         assert_eq!(summary.total_output_bytes, 100);
-        
+
         assert_eq!(summary.by_filter.len(), 1);
         assert_eq!(summary.by_filter[0].filter_name, "f1");
         assert_eq!(summary.by_filter[0].count, 2);

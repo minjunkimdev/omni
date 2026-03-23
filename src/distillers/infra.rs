@@ -1,5 +1,5 @@
-use crate::pipeline::{ContentType, OutputSegment};
 use crate::distillers::Distiller;
+use crate::pipeline::{ContentType, OutputSegment};
 
 pub struct InfraDistiller;
 
@@ -9,9 +9,13 @@ impl Distiller for InfraDistiller {
     }
 
     fn distill(&self, segments: &[OutputSegment], input: &str) -> String {
-        if input.contains("kubectl") || (input.contains("READY") && input.contains("STATUS") && input.contains("RESTARTS")) {
+        if input.contains("kubectl")
+            || (input.contains("READY") && input.contains("STATUS") && input.contains("RESTARTS"))
+        {
             distill_kubectl(input)
-        } else if input.contains("docker build") || (input.contains("Step ") && input.contains(" : ")) {
+        } else if input.contains("docker build")
+            || (input.contains("Step ") && input.contains(" : "))
+        {
             distill_docker(input)
         } else if input.contains("Terraform will perform") {
             distill_terraform(input)
@@ -22,7 +26,10 @@ impl Distiller for InfraDistiller {
                 out.push('\n');
             }
             if segments.len() > 20 {
-                out.push_str(&format!("... {} more infra log lines\n", segments.len() - 20));
+                out.push_str(&format!(
+                    "... {} more infra log lines\n",
+                    segments.len() - 20
+                ));
             }
             out.trim().to_string()
         }
@@ -37,14 +44,19 @@ fn distill_kubectl(input: &str) -> String {
     let mut total = 0;
 
     for line in input.lines().skip(1) {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
         total += 1;
         let p = line.split_whitespace().collect::<Vec<_>>();
         if p.len() >= 3 {
             let status = p[2];
             if status == "Running" || status == "Completed" {
                 running += 1;
-            } else if status == "Pending" || status == "ContainerCreating" || status.contains("Wait") {
+            } else if status == "Pending"
+                || status == "ContainerCreating"
+                || status.contains("Wait")
+            {
                 pending += 1;
                 non_running_pods.push(format!("{} ({})", p[0], status));
             } else {
@@ -54,9 +66,11 @@ fn distill_kubectl(input: &str) -> String {
         }
     }
 
-    let mut out = format!("k8s: {} pods | {} running, {} pending, {} failed", 
-        total, running, pending, failed);
-    
+    let mut out = format!(
+        "k8s: {} pods | {} running, {} pending, {} failed",
+        total, running, pending, failed
+    );
+
     if !non_running_pods.is_empty() {
         out.push_str("\nNon-running: ");
         out.push_str(&non_running_pods.join(", "));
@@ -82,7 +96,10 @@ fn distill_docker(input: &str) -> String {
         }
     }
 
-    format!("docker: {} steps | {} cached | {}", steps_total, cached, result)
+    format!(
+        "docker: {} steps | {} cached | {}",
+        steps_total, cached, result
+    )
 }
 
 fn distill_terraform(input: &str) -> String {
@@ -93,19 +110,34 @@ fn distill_terraform(input: &str) -> String {
 
     for line in input.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with('+') && trimmed.contains("resource") { added += 1; resources.push(trimmed.to_string()); }
-        if trimmed.starts_with('~') && trimmed.contains("resource") { changed += 1; resources.push(trimmed.to_string()); }
-        if trimmed.starts_with('-') && trimmed.contains("resource") { destroyed += 1; resources.push(trimmed.to_string()); }
+        if trimmed.starts_with('+') && trimmed.contains("resource") {
+            added += 1;
+            resources.push(trimmed.to_string());
+        }
+        if trimmed.starts_with('~') && trimmed.contains("resource") {
+            changed += 1;
+            resources.push(trimmed.to_string());
+        }
+        if trimmed.starts_with('-') && trimmed.contains("resource") {
+            destroyed += 1;
+            resources.push(trimmed.to_string());
+        }
     }
 
-    let mut out = format!("terraform: {} to add, {} to change, {} to destroy\n", added, changed, destroyed);
+    let mut out = format!(
+        "terraform: {} to add, {} to change, {} to destroy\n",
+        added, changed, destroyed
+    );
     let max_res = 5;
     for (i, res) in resources.iter().enumerate() {
         if i < max_res {
             out.push_str(res);
             out.push('\n');
         } else {
-            out.push_str(&format!("... {} more resources\n", resources.len() - max_res));
+            out.push_str(&format!(
+                "... {} more resources\n",
+                resources.len() - max_res
+            ));
             break;
         }
     }

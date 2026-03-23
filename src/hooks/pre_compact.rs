@@ -30,8 +30,6 @@ pub struct HookSpecificOutput {
     pub system_prompt_addition: String,
 }
 
-
-
 pub fn process_payload(
     input_str: &str,
     store: Arc<Store>,
@@ -142,8 +140,8 @@ fn build_compact_summary(state: &SessionState, store: &Store) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use serde_json::json;
+    use tempfile::tempdir;
 
     fn get_store() -> (Arc<Store>, tempfile::TempDir) {
         let dir = tempdir().unwrap();
@@ -155,7 +153,7 @@ mod tests {
     fn test_pre_compact_output_valid_json_format() {
         let (store, _dir) = get_store();
         let session = Arc::new(Mutex::new(SessionState::new()));
-        
+
         let input = json!({
             "hookEventName": "PreCompact",
             "sessionId": "123",
@@ -165,7 +163,12 @@ mod tests {
         let out_str = process_payload(&input.to_string(), store, session).unwrap();
         let parsed: HookOutput = serde_json::from_str(&out_str).unwrap();
         assert_eq!(parsed.hook_specific_output.hook_event_name, "PreCompact");
-        assert!(parsed.hook_specific_output.system_prompt_addition.contains("OMNI Checkpoint"));
+        assert!(
+            parsed
+                .hook_specific_output
+                .system_prompt_addition
+                .contains("OMNI Checkpoint")
+        );
     }
 
     #[test]

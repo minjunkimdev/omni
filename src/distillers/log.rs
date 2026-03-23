@@ -1,5 +1,5 @@
-use crate::pipeline::{ContentType, OutputSegment, SignalTier};
 use crate::distillers::Distiller;
+use crate::pipeline::{ContentType, OutputSegment, SignalTier};
 
 pub struct LogDistiller;
 
@@ -14,7 +14,7 @@ impl Distiller for LogDistiller {
 
         while i < segments.len() {
             let seg = &segments[i];
-            
+
             if seg.tier == SignalTier::Critical || seg.tier == SignalTier::Important {
                 if i > 0 && segments[i - 1].tier == SignalTier::Context {
                     out.push_str(&segments[i - 1].content);
@@ -43,7 +43,10 @@ impl Distiller for LogDistiller {
                     fallback.push_str(&seg.content);
                     fallback.push('\n');
                 } else {
-                    fallback.push_str(&format!("... [{} more log lines]", segments.len() - max_lines));
+                    fallback.push_str(&format!(
+                        "... [{} more log lines]",
+                        segments.len() - max_lines
+                    ));
                     break;
                 }
             }

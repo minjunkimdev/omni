@@ -1,7 +1,6 @@
-/// Hook E2E tests — spawn the omni binary as a child process.
-
-use std::process::{Command, Stdio};
 use std::io::Write;
+/// Hook E2E tests — spawn the omni binary as a child process.
+use std::process::{Command, Stdio};
 
 fn omni_binary() -> String {
     // Cargo sets this during `cargo test`
@@ -10,8 +9,8 @@ fn omni_binary() -> String {
 
 #[test]
 fn test_hook_e2e_git_diff() {
-    let fixture = std::fs::read_to_string("tests/fixtures/git_diff_multi_file.txt")
-        .expect("fixture missing");
+    let fixture =
+        std::fs::read_to_string("tests/fixtures/git_diff_multi_file.txt").expect("fixture missing");
 
     let mock_input = serde_json::json!({
         "hook_event_name": "PostToolUse",
@@ -30,14 +29,21 @@ fn test_hook_e2e_git_diff() {
         .spawn()
         .expect("Failed to spawn omni");
 
-    child.stdin.take().unwrap()
+    child
+        .stdin
+        .take()
+        .unwrap()
         .write_all(mock_input.to_string().as_bytes())
         .expect("Failed to write stdin");
 
     let output = child.wait_with_output().expect("Failed to wait");
-    
+
     // Hook should exit cleanly (0)
-    assert!(output.status.success(), "Hook exited with non-zero: {:?}", output.status);
+    assert!(
+        output.status.success(),
+        "Hook exited with non-zero: {:?}",
+        output.status
+    );
 
     // Output should be valid JSON
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -66,13 +72,20 @@ fn test_hook_non_bash_exit_clean() {
         .spawn()
         .expect("Failed to spawn omni");
 
-    child.stdin.take().unwrap()
+    child
+        .stdin
+        .take()
+        .unwrap()
         .write_all(mock_input.to_string().as_bytes())
         .unwrap();
 
     let output = child.wait_with_output().unwrap();
     // Non-Bash tools should still exit cleanly
-    assert!(output.status.success(), "Non-Bash hook should exit 0, got {:?}", output.status);
+    assert!(
+        output.status.success(),
+        "Non-Bash hook should exit 0, got {:?}",
+        output.status
+    );
 }
 
 #[test]
@@ -85,13 +98,20 @@ fn test_hook_invalid_json_exit_clean() {
         .spawn()
         .expect("Failed to spawn omni");
 
-    child.stdin.take().unwrap()
+    child
+        .stdin
+        .take()
+        .unwrap()
         .write_all(b"this is not json at all {{{")
         .unwrap();
 
     let output = child.wait_with_output().unwrap();
     // Invalid JSON should exit cleanly (graceful degradation)
-    assert!(output.status.success(), "Invalid JSON should exit 0, got {:?}", output.status);
+    assert!(
+        output.status.success(),
+        "Invalid JSON should exit 0, got {:?}",
+        output.status
+    );
 }
 
 #[test]
@@ -113,18 +133,25 @@ fn test_hook_short_content_exit_clean() {
         .spawn()
         .expect("Failed to spawn omni");
 
-    child.stdin.take().unwrap()
+    child
+        .stdin
+        .take()
+        .unwrap()
         .write_all(mock_input.to_string().as_bytes())
         .unwrap();
 
     let output = child.wait_with_output().unwrap();
     assert!(output.status.success(), "Short content hook should exit 0");
-    
+
     // Short content should either pass through or produce minimal output
     let stdout = String::from_utf8_lossy(&output.stdout);
     if !stdout.trim().is_empty() {
         let parsed: Result<serde_json::Value, _> = serde_json::from_str(stdout.trim());
-        assert!(parsed.is_ok(), "Output must be valid JSON if present: {}", stdout);
+        assert!(
+            parsed.is_ok(),
+            "Output must be valid JSON if present: {}",
+            stdout
+        );
     }
 }
 
@@ -139,7 +166,10 @@ fn test_pipe_mode_via_binary() {
         .spawn()
         .expect("Failed to spawn omni");
 
-    child.stdin.take().unwrap()
+    child
+        .stdin
+        .take()
+        .unwrap()
         .write_all(input.as_bytes())
         .unwrap();
 
@@ -159,7 +189,10 @@ fn test_cli_version() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("omni"), "Version output should contain 'omni'");
+    assert!(
+        stdout.contains("omni"),
+        "Version output should contain 'omni'"
+    );
 }
 
 #[test]
@@ -174,7 +207,10 @@ fn test_cli_help() {
     assert!(stdout.contains("stats"), "Help should list stats command");
     assert!(stdout.contains("doctor"), "Help should list doctor command");
     assert!(stdout.contains("learn"), "Help should list learn command");
-    assert!(stdout.contains("session"), "Help should list session command");
+    assert!(
+        stdout.contains("session"),
+        "Help should list session command"
+    );
 }
 
 #[test]
@@ -185,9 +221,15 @@ fn test_cli_unknown_command() {
         .expect("Failed to run");
 
     // Unknown command should exit non-zero
-    assert!(!output.status.success(), "Unknown command should exit non-zero");
+    assert!(
+        !output.status.success(),
+        "Unknown command should exit non-zero"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("unknown command"), "Should show unknown command error");
+    assert!(
+        stderr.contains("unknown command"),
+        "Should show unknown command error"
+    );
 }
 
 #[test]
@@ -211,5 +253,8 @@ fn test_cli_stats_no_crash() {
 
     assert!(output.status.success(), "Stats should exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Signal Report"), "Stats should show report header");
+    assert!(
+        stdout.contains("Signal Report"),
+        "Stats should show report header"
+    );
 }

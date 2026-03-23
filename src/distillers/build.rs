@@ -1,5 +1,5 @@
-use crate::pipeline::{ContentType, OutputSegment, SignalTier};
 use crate::distillers::Distiller;
+use crate::pipeline::{ContentType, OutputSegment, SignalTier};
 
 pub struct BuildDistiller;
 
@@ -21,12 +21,16 @@ impl Distiller for BuildDistiller {
         }
 
         let mut out = String::new();
-        
+
         if errors.is_empty() && warnings.is_empty() {
             return "Build: ok".to_string();
         }
 
-        out.push_str(&format!("Build: {} errors, {} warnings\n", errors.len(), warnings.len()));
+        out.push_str(&format!(
+            "Build: {} errors, {} warnings\n",
+            errors.len(),
+            warnings.len()
+        ));
 
         for err in &errors {
             out.push_str(err);
@@ -39,7 +43,10 @@ impl Distiller for BuildDistiller {
                 out.push_str(warn);
                 out.push('\n');
             } else {
-                out.push_str(&format!("... {} more warnings\n", warnings.len() - max_warns));
+                out.push_str(&format!(
+                    "... {} more warnings\n",
+                    warnings.len() - max_warns
+                ));
                 break;
             }
         }

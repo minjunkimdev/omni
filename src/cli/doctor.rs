@@ -1,16 +1,26 @@
-use std::path::PathBuf;
-use std::fs;
-use crate::store::sqlite::Store;
 use crate::cli::init::get_settings_path;
+use crate::store::sqlite::Store;
+use std::fs;
+use std::path::PathBuf;
 
 fn format_time_ago(ts: u64) -> String {
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-    if ts >= now { return "just now".to_string(); }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    if ts >= now {
+        return "just now".to_string();
+    }
     let diff = now - ts;
-    if diff < 60 { format!("{} seconds ago", diff) }
-    else if diff < 3600 { format!("{} minutes ago", diff / 60) }
-    else if diff < 86400 { format!("{} hours ago", diff / 3600) }
-    else { format!("{} days ago", diff / 86400) }
+    if diff < 60 {
+        format!("{} seconds ago", diff)
+    } else if diff < 3600 {
+        format!("{} minutes ago", diff / 60)
+    } else if diff < 86400 {
+        format!("{} hours ago", diff / 3600)
+    } else {
+        format!("{} days ago", diff / 86400)
+    }
 }
 
 pub fn run() -> anyhow::Result<()> {
@@ -20,13 +30,19 @@ pub fn run() -> anyhow::Result<()> {
     println!("─────────────────────────────────────────");
     println!(" OMNI Doctor — Installation Diagnostics");
     println!("─────────────────────────────────────────");
-    
+
     // 1. Binary Version
     println!(" Binary:         omni v{} [OK]", env!("CARGO_PKG_VERSION"));
-    
+
     // 2. Config Dir
-    let conf_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".omni");
-    if conf_dir.exists() && fs::metadata(&conf_dir).map(|m| !m.permissions().readonly()).unwrap_or(false) {
+    let conf_dir = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".omni");
+    if conf_dir.exists()
+        && fs::metadata(&conf_dir)
+            .map(|m| !m.permissions().readonly())
+            .unwrap_or(false)
+    {
         println!(" Config dir:     ~/.omni/ [OK]");
     } else {
         println!(" Config dir:     ~/.omni/ [ERROR]");
@@ -38,16 +54,21 @@ pub fn run() -> anyhow::Result<()> {
     match Store::open() {
         Ok(store) => {
             let (sessions, rewinds) = store.stats().unwrap_or_default();
-            println!(" Database:       ~/.omni/omni.db ({} records) [OK]", sessions);
-            
+            println!(
+                " Database:       ~/.omni/omni.db ({} records) [OK]",
+                sessions
+            );
+
             if store.check_fts5() {
                 println!(" FTS5:           available [OK]");
             } else {
                 println!(" FTS5:           missing [WARNING]");
-                warnings.push("SQLite FTS5 extension is not enabled. Search capabilities will be degraded.");
+                warnings.push(
+                    "SQLite FTS5 extension is not enabled. Search capabilities will be degraded.",
+                );
                 all_ok = false;
             }
-            
+
             // 9. RewindStore
             println!(" \n RewindStore:   {} items tracked\n", rewinds);
 
@@ -72,48 +93,54 @@ pub fn run() -> anyhow::Result<()> {
             all_ok = false;
         }
     }
-    
+
     // 4. Hook entries in ~/.claude/settings.json
     println!(" Hooks (Claude Code):");
     match get_settings_path() {
-        path => if path.exists() {
-            if let Ok(content) = fs::read_to_string(&path) {
-                if content.contains("omni --hook --post-tool") {
-                    println!("   PostToolUse:  [OK] installed");
-                } else {
-                    println!("   PostToolUse:  [WARNING] missing");
-                    warnings.push("PostToolUse hook is not installed. Run `omni init`.");
-                    all_ok = false;
+        path => {
+            if path.exists() {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    if content.contains("omni --hook --post-tool") {
+                        println!("   PostToolUse:  [OK] installed");
+                    } else {
+                        println!("   PostToolUse:  [WARNING] missing");
+                        warnings.push("PostToolUse hook is not installed. Run `omni init`.");
+                        all_ok = false;
+                    }
+
+                    if content.contains("omni --hook --session-start") {
+                        println!("   SessionStart: [OK] installed");
+                    } else {
+                        println!("   SessionStart: [WARNING] missing");
+                        warnings.push("SessionStart hook is not installed.");
+                        all_ok = false;
+                    }
+
+                    if content.contains("omni --hook --pre-compact") {
+                        println!("   PreCompact:   [OK] installed");
+                    } else {
+                        println!("   PreCompact:   [WARNING] missing");
+                        warnings.push("PreCompact hook is not installed.");
+                        all_ok = false;
+                    }
                 }
-                
-                if content.contains("omni --hook --session-start") {
-                    println!("   SessionStart: [OK] installed");
-                } else {
-                    println!("   SessionStart: [WARNING] missing");
-                    warnings.push("SessionStart hook is not installed.");
-                    all_ok = false;
-                }
-                
-                if content.contains("omni --hook --pre-compact") {
-                    println!("   PreCompact:   [OK] installed");
-                } else {
-                    println!("   PreCompact:   [WARNING] missing");
-                    warnings.push("PreCompact hook is not installed.");
-                    all_ok = false;
-                }
+            } else {
+                println!("   Hooks:        [ERROR] settings.json not found.");
+                warnings.push("Claude settings not found. Have you installed Claude Code?");
+                all_ok = false;
             }
-        } else {
-            println!("   Hooks:        [ERROR] settings.json not found.");
-            warnings.push("Claude settings not found. Have you installed Claude Code?");
-            all_ok = false;
         }
     }
     println!();
-    
+
     // 5. MCP Server registration
-    let mcp_path = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join("Library/Application Support/Claude/claude_desktop_config.json");
-    let mcpa_path = dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".claude.json");
-    
+    let mcp_path = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("Library/Application Support/Claude/claude_desktop_config.json");
+    let mcpa_path = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".claude.json");
+
     let mut mcp_found = false;
     for p in &[mcp_path, mcpa_path] {
         if p.exists() {
@@ -140,19 +167,22 @@ pub fn run() -> anyhow::Result<()> {
     let mut local = 0;
 
     for f in &all_filters {
-        if f.name.starts_with("sys_") { built_in += 1; }
-        else { user += 1; } // Simplify: assume all non sys_ are user/local
+        if f.name.starts_with("sys_") {
+            built_in += 1;
+        } else {
+            user += 1;
+        } // Simplify: assume all non sys_ are user/local
     }
-    
+
     println!("   Built-in:    {} filters loaded", built_in);
-    
+
     let user_dir = conf_dir.join("filters");
     if user_dir.exists() {
         println!("   User:        ~/.omni/filters/ ({} filters)", user);
     } else {
         println!("   User:        ~/.omni/filters/ (missing) [WARNING]");
     }
-    
+
     let project_dir = PathBuf::from(".omni/filters");
     if project_dir.exists() {
         if crate::guard::trust::is_trusted(std::env::current_dir().unwrap_or_default().as_path()) {
@@ -167,7 +197,11 @@ pub fn run() -> anyhow::Result<()> {
     }
 
     // Status Footer
-    println!("\n Status: {}  {}", if all_ok { "ALL OK" } else { "ATTENTION NEEDED" }, if all_ok { "✓" } else { "⚠" });
+    println!(
+        "\n Status: {}  {}",
+        if all_ok { "ALL OK" } else { "ATTENTION NEEDED" },
+        if all_ok { "✓" } else { "⚠" }
+    );
     if !warnings.is_empty() {
         println!("─────────────────────────────────────────");
         println!(" Suggestions:");
